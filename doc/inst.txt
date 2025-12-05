@@ -1,0 +1,45 @@
+
+LOAD    reg,                imm16 | reg:reg     load word                       reg <- [imm16 | reg:reg]
+STORE   imm16 | reg:reg     reg                 store word                      [imm16 | reg:reg] <- reg
+MOVE    reg,                reg | imm8          move word                       reg <- reg | imm8
+
+PUSH    reg | imm8                              push to stack                   [SP--] <- imm8/reg   *note that the stack grows downwards
+POP     reg                                     pop from stack                  reg <- [++SP]        *note that the stack grows downwards
+
+ADD     reg,                reg | imm8          add                             reg <- reg + (imm8 | reg) 
+ADDC    reg,                reg | imm8          add with carry                  reg <- reg + (imm8 | reg) + c
+
+SUB     reg,                reg | imm8          subtract                        reg <- reg - (imm8 | reg)
+SUBB    reg,                reg | imm8          subract with borrow             reg <- reg - (imm8 | reg) - b
+
+INC     reg                                     increment                       reg <- reg + 1
+DEC     reg                                     decrement                       reg <- reg - 1
+
+SHL     reg,                reg | imm8          bit shift left                  reg <- reg << (reg | imm8)
+SHR     reg,                reg | imm8          bit shift right                 reg <- reg >> (reg | imm8)
+
+AND     reg,                reg | imm8          bitwise and                     reg <- reg AND (reg | imm8)
+OR      reg,                reg | imm8          bitwise or                      reg <- reg OR  (reg | imm8)
+NOT     reg,                reg | imm8          bitwise not                     reg <- reg NOT (reg | imm8)
+NOR     reg,                reg | imm8          bitwise nor                     reg <- reg NOR (reg | imm8)
+XOR     reg,                reg | imm8          bitwise xor                     reg <- reg XOR (reg | imm8)
+
+INB     reg,                port(reg | imm8)    get byte from I/O port          reg <- port(reg | imm8)
+OUTB    reg,                port(reg | imm8)    send byte through I/O port      port(reg | imm8) <- reg
+
+CALL    imm16 | reg:reg                         call subroutine                 this istruction is a built-in macro
+RET                                             return from subroutine          this istruction is a built-in macro
+
+CMP     reg,                reg | imm8          compare
+SEC                                             set carry flag                  carry flag <- 1
+CLC                                             clear carry flag                carry flag <- 0
+CLZ                                             clear zero flag                 zero flag <- 0
+
+JMP     imm16 | reg:reg                         unconditional jump              PC <- [imm16 | reg:reg]
+JNZ     imm16 | reg:reg                         jump of not zero                PC <- [imm16 | reg:reg] if zero flag is 1 else PC
+JZR     imm16 | reg:reg                         jump if zero                    PC <- [imm16 | reg:reg] if zero flag is 0 else PC
+JC      imm16 | reg:reg                         jump if carry                   PC <- [imm16 | reg:reg] if carry flag is 1 else PC
+JNC     imm16 | reg:reg                         jump if not carry               PC <- [imm16 | reg:reg] if carry flag is 0 else PC
+
+HLT                                             halt                            status <- HALT
+NOP                                             no operation                    n/a

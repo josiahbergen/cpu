@@ -1,0 +1,104 @@
+===============================
+==        CPU DESIGN         ==
+===============================
+
+
+-- Features --
+
+8-bit data width
+16-bit address bus (64k of accessable memory)
+Memory banking
+Interrupts!
+Device communication through built-in CPU instructions
+
+
+-- Instruction Layout --
+
+8 bits per instruction.
+Instruction format: [ XXXX | Y | ZZZZ ]
+
+- XXXX is the instruction operand code.
+- Y defines the register referenced in the first operand (if applicable)
+- ZZZ defines whether to use immediate or register value
+
+If there is a second reg operand, it is contained in the first three bits of the second instruction byte.
+
+note: there is never more than one choice between imm/reg per instruction.
+note: the opcode will encode if this choice affects the first or second operand,
+note: and the length of the instruction in both cases
+
+examples:
+operation, reg        ->  one byte. register is encoded within.
+operation, imm8       ->  two bytes. imm8 is the byte after the instruction byte.
+operation, reg, imm8  ->  two bytes. reg is encoded within the first byte, imm8 is the second.
+operation, reg, reg   ->  two bytes. reg is encoded within the first byte and the first three bits of the second.
+operation, reg, imm16 ->  three bytes. reg is encoded within the first byte and the imm16 is the next two.
+operation, imm16, reg ->  three bytes. reg is encoded within the first byte and the imm16 is the next two.
+
+
+-- instruction set --
+
+0: LOAD reg, imm16/XZ -> reg = [imm16 or XZ]
+Load the byte at address imm16 or at address in register pair XZ into reg.
+
+1: MOVE reg, imm8/reg -> reg = (imm8 or reg)
+Move the value from imm8 or another register into reg.
+
+2: STORE imm16/XZ, reg -> [imm16 or XZ] = reg
+Store the value in reg into RAM at address imm16 or at address in register pair XZ.
+
+3: PUSH reg/imm8 -> push(reg or imm8)
+Push the value in reg or an 8-bit immediate onto the stack.
+
+4: POP reg -> reg = pop()
+Pop the top of the stack into reg.
+
+5: ADD reg, reg/imm8 -> reg = reg + (reg or imm8)
+Add a register or 8-bit immediate to reg. Result stored in reg.
+
+6: SUB reg, reg/imm8 -> reg = reg - (reg or imm8)
+Subtract a register or 8-bit immediate from reg. Result stored in reg.
+
+7: SHL reg, reg/imm8 -> reg = reg << (reg or imm8)
+Logical shift reg left by the amount in reg or imm8.
+
+8: SHR reg, reg/imm8 -> reg = reg >> (reg or imm8)
+Logical shift reg right by the amount in reg or imm8.
+
+9: AND reg, reg/imm8 -> reg = reg & (reg or imm8)
+Bitwise AND reg with reg or imm8. Result stored in reg.
+
+A: OR  reg, reg/imm8 -> reg = reg | (reg or imm8)
+Bitwise OR reg with reg or imm8. Result stored in reg.
+
+B: NOR reg, reg/imm8 -> reg = ~(reg | (reg or imm8))
+Bitwise NOR reg with reg or imm8. Result stored in reg.
+
+C: INB reg, port(reg/imm8) -> reg = IO[(reg or imm8)]
+Read an 8-bit value from an I/O port into reg.
+
+D: OUTB port(reg/imm8), reg  -> IO[(reg or imm8)] = reg
+Write reg to an I/O port.
+
+E: CMP reg, reg/imm8 -> flags = reg - (reg or imm8)
+Compare reg with reg or imm8. Updates flags only.
+
+F: JNZ imm16/reg -> if (Z==0) PC = (imm16 or regpair)
+Jump to imm16 or the address in a register pair if zero flag is not set.
+
+-- registers --
+
+all registers are stored internally in the CPU.
+
+four 8-bit registers:
+A: (accumulator/general purpose)
+B: (general purpose)
+X: (low address/general purpose)
+Z: (high address/general purpose)
+
+memory-mapped registers:
+F: (flags)
+Z: (zero register)
+PC: (program counter)
+SP: (stack pointer)
+MB: (memory bank)
