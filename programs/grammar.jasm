@@ -1,0 +1,8 @@
+start:
+    LOAD A, 0x1000
+    LOAD B, 0x1001
+    LOAD X, A:B
+
+    STORE X, 0x2000
+    STORE B, A:B
+    HALT

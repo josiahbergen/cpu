@@ -30,8 +30,7 @@ class Logger:
         print(colorama.Back.BLUE + colorama.Fore.BLACK + message + colorama.Fore.RESET + colorama.Back.RESET)
 
 
-# EBNF-like Grammar
-
+# EBNF-like grammar
 GRAMMAR = r"""
     ?start: line*
 
@@ -53,9 +52,9 @@ GRAMMAR = r"""
 
     # priorities for token matching
     # higher number = higher priority
-    MNEMONIC.100: /(LOAD|MOVE|MOV|STORE|PUSH|POP|ADD|SUB|SHL|SHR|AND|OR|NOR|INB|OUTB|CMP|JNZ|HLT)\b/i
-    REGISTER_PAIR.90: /(A|B|C|D|X|Y|SP|PC|Z|F):(A|B|C|D|X|Y|SP|PC|Z|F)/i
-    REGISTER.80: /(A|B|C|D|X|Y|SP|PC|Z|F)\b/i
+    MNEMONIC.100: /(LOAD|STORE|MOVE|MOV|PUSH|POP|ADD|ADDC|SUB|SUBB|INC|DEC|SHL|SHR|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|SEC|CLC|CLZ|JMP|JZ|JNZ|JC|JNC|INT|HALT|NOP)\b/i
+    REGISTER_PAIR.90: /(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS):(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS)/i
+    REGISTER.80: /(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS)\b/i
     LABELNAME.10: /[A-Za-z_][A-Za-z0-9_]*/
 
     NUMBER: /0[xX][0-9a-fA-F]+/
@@ -66,9 +65,3 @@ GRAMMAR = r"""
     %ignore WS
     %ignore COMMENT
 """
-
-
-OPERAND_TYPES = {
-    "name_operand": "name",
-    "number_operand": "number"
-}

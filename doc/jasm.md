@@ -2,44 +2,51 @@
 
 `JASM` (or `J-ASM`) is a custom assembly language.
 
-It has a custom assembler that produces binaries for the JOKOR architecture.
+It has a custom assembler that produces binaries for the [JOKOR Architecture](spec.md).
 
-## Instruction Set
+## How to Run Your Code
 
-| Opcode   | Mnemonic    |  Operand 1            | Operand 2            | Description                      | Operation |
-|---|---|---|---|---|---|
-| 0        | LOAD        |  reg                  | [imm16 \| reg:reg]    | load 8-bit value from memory     | reg <- [imm16 \| reg:reg] |
-| 1        | STORE       |  reg                  | [imm16 \| reg:reg]    | store 8-bit value to memory      | [imm16 \| reg:reg] <- reg |
-| 2        | MOVE        |  reg                  | reg \| imm8           | move 8-bit value                 | reg <- reg \| imm8 |
-| 3        | PUSH        |  reg \| imm8          |  | push to stack                    | [SP--] <- imm8/reg |
-| 4        | POP         |  reg                  |  | pop from stack                   | reg <- [++SP]   |
-| 5        | ADD^        |  reg                  | reg \| imm8           | add                              | reg <- reg + (imm8 \| reg)  |
-| 6        | ADDC^       |  reg                  | reg \| imm8           | add with carry                   | reg <- reg + (imm8 \| reg) |
-| 7        | SUB^        |  reg                  | reg \| imm8           | subtract                         | reg <- reg - (imm8 \| reg) |
-| 8        | SUBB^       |  reg                  | reg \| imm8           | subract with borrow              | reg <- reg - (imm8 \| reg) |
-| 9        | INC         |  reg                  |  | increment                        | reg <- reg + 1 |
-| 10       | DEC         |  reg                  |  | decrement                        | reg <- reg - 1 |
-| 11       | SHL         |  reg                  | reg \| imm8           | bit shift left                   | reg <- reg << (reg \| imm8) |
-| 12       | SHR         |  reg                  | reg \| imm8           | bit shift right                  | reg <- reg >> (reg \| imm8) |
-| 13       | AND         |  reg                  | reg \| imm8           | bitwise and                      | reg <- reg AND (reg \| imm8) |
-| 14       | OR          |  reg                  | reg \| imm8           | bitwise or                       | reg <- reg OR  (reg \| imm8) |
-| 15       | NOR         |  reg                  | reg \| imm8           | bitwise nor                      | reg <- reg NOR (reg \| imm8) |
-| 16       | NOT         |  reg                  |                      | bitwise not                      | reg <- reg NOR (reg \| imm8) |
-| 17       | XOR         |  reg                  | reg \| imm8           | bitwise xor                      | reg <- reg XOR (reg \| imm8)   |
-| 18       | INB         |  reg                  | port(reg \| imm8)     | get byte from I/O port           | reg <- port(reg \| imm8) |
-| 19       | OUTB        |  reg                  | port(reg \| imm8)     | send byte through I/O port       | port(reg \| imm8) <- reg |
-| 20       | CMP^        |  reg                  | reg \| imm8           | compare                          | UNDEFINED FOR NOW |
-| 21       | SEC         |                       |                      | set carry flag                   | carry flag <- 1 |
-| 22       | CLC         |                       |                      | clear carry flag                 | carry flag <- 0 |
-| 23       | CLZ         |                       |                      | clear zero flag                  | zero flag  <- 0 |
-| 24       | JMP         |  [imm16 \| reg:reg]    |  | unconditional jump               | PC <- [imm16 \| reg:reg] |
-| 25       | JZ          |  [imm16 \| reg:reg]    |                      | jump if zero                     | PC <- [imm16 \| reg:reg] if zero flag is 1 else NOP |
-| 26       | JNZ         |  [imm16 \| reg:reg]    |                      | jump of not zero                 | PC <- [imm16 \| reg:reg] if zero flag is 0 else NOP |
-| 27       | JC          |  [imm16 \| reg:reg]    |                      | jump if carry                    | PC <- [imm16 \| reg:reg] if carry flag is 1 else NOP |
-| 28       | JNC         |  [imm16 \| reg:reg]    |                      | jump if not carry                | PC <- [imm16 \| reg:reg] if carry flag is 0 else NOP |
-| 29       | INT*        |   imm8                |                      | call an interrupt                | UNDEFINED FOR NOW |
-| 30       | HLT*        |                       |                      | halt                             | halted flag <- 1 |
-| 31       | NOP         |                       |                      | no operation                     | n/a |
+JASM files use the `.jasm` file extension. Compile your code with `python jasm.py hello.jasm -o hello.bin`.
 
-^ these instructions modify the flags register. <br>
-\* these instructions modify the status register.
+Once assembled to a binary file, run your code with `python emulator.py hello.bin`.
+
+## Instruction Set Reference
+
+| OPCODE | MNEMONIC | OPERAND 1          | OPERAND 2          | DESCRIPTION                  | OPERATION                                                |
+| ------ | -------- | ------------------ | ------------------ | ---------------------------- | -------------------------------------------------------- |
+| 0      | LOAD     | reg                | [imm16 \| reg:reg] | load 8-bit value from memory | reg <- [imm16 \| reg:reg]                                |
+| 1      | STORE    | reg                | [imm16 \| reg:reg] | store 8-bit value to memory  | [imm16 \| reg:reg] <- reg                                |
+| 2      | MOVE     | reg                | reg \| imm8        | move 8-bit value             | reg <- reg \| imm8                                       |
+| 3      | PUSH     | reg \| imm8        |                    | push to stack                | [SP--] <- imm8/reg \*note that the stack grows downwards |
+| 4      | POP      | reg                |                    | pop from stack               | reg <- [++SP] \*note that the stack grows down           |
+| 5      | ADD^     | reg                | reg \| imm8        | add                          | reg <- reg + (imm8 \| reg)                               |
+| 6      | ADDC^    | reg                | reg \| imm8        | add with carry               | reg <- reg + (imm8 \| reg)                               |
+| 7      | SUB^     | reg                | reg \| imm8        | subtract                     | reg <- reg - (imm8 \| reg)                               |
+| 8      | SUBB^    | reg                | reg \| imm8        | subract with borrow          | reg <- reg - (imm8 \| reg)                               |
+| 9      | INC      | reg                |                    | increment                    | reg <- reg + 1                                           |
+| 10     | DEC      | reg                |                    | decrement                    | reg <- reg - 1                                           |
+| 11     | SHL      | reg                | reg \| imm8        | bit shift left               | reg <- reg << (reg \| imm8)                              |
+| 12     | SHR      | reg                | reg \| imm8        | bit shift right              | reg <- reg >> (reg \| imm8)                              |
+| 13     | AND      | reg                | reg \| imm8        | bitwise and                  | reg <- reg AND (reg \| imm8)                             |
+| 14     | OR       | reg                | reg \| imm8        | bitwise or                   | reg <- reg OR (reg \| imm8)                              |
+| 15     | NOR      | reg                | reg \| imm8        | bitwise nor                  | reg <- reg NOR (reg \| imm8)                             |
+| 16     | NOT      | reg                |                    | bitwise not                  | reg <- reg NOR (reg \| imm8)                             |
+| 17     | XOR      | reg                | reg \| imm8        | bitwise xor                  | reg <- reg XOR (reg \| imm8)                             |
+| 18     | INB      | reg                | port(reg \| imm8)  | get byte from I/O port       | reg <- port(reg \| imm8)                                 |
+| 19     | OUTB     | reg                | port(reg \| imm8)  | send byte through I/O port   | port(reg \| imm8) <- reg                                 |
+| 20     | CMP^     | reg                | reg \| imm8        | compare                      | UNDEFINED FOR NOW                                        |
+| 21     | SEC      |                    |                    | set carry flag               | carry flag <- 1                                          |
+| 22     | CLC      |                    |                    | clear carry flag             | carry flag <- 0                                          |
+| 23     | CLZ      |                    |                    | clear zero flag              | zero flag <- 0                                           |
+| 24     | JMP      | [imm16 \| reg:reg] |                    | unconditional jump           | PC <- [imm16 \| reg:reg]                                 |
+| 25     | JZ       | [imm16 \| reg:reg] |                    | jump if zero                 | PC <- [imm16 \| reg:reg] if zero flag is 1 else NOP      |
+| 26     | JNZ      | [imm16 \| reg:reg] |                    | jump of not zero             | PC <- [imm16 \| reg:reg] if zero flag is 0 else NOP      |
+| 27     | JC       | [imm16 \| reg:reg] |                    | jump if carry                | PC <- [imm16 \| reg:reg] if carry flag is 1 else NOP     |
+| 28     | JNC      | [imm16 \| reg:reg] |                    | jump if not carry            | PC <- [imm16 \| reg:reg] if carry flag is 0 else NOP     |
+| 29     | INT\*    | imm8               |                    | call an interrupt            | UNDEFINED FOR NOW                                        |
+| 30     | HALT\*   |                    |                    | halt                         | halted flag <- 1                                         |
+| 31     | NOP      |                    |                    | no operation                 | n/a                                                      |
+
+^ These instructions modify the flags register.
+
+\* These instructions modify the status register.

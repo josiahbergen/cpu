@@ -33,8 +33,8 @@ OPCODE  MNEMONIC    OPERAND 1           OPERAND 2           DESCRIPTION         
 26      JNZ         [imm16 | reg:reg]                       jump of not zero                PC <- [imm16 | reg:reg] if zero flag is 0 else NOP
 27      JC          [imm16 | reg:reg]                       jump if carry                   PC <- [imm16 | reg:reg] if carry flag is 1 else NOP
 28      JNC         [imm16 | reg:reg]                       jump if not carry               PC <- [imm16 | reg:reg] if carry flag is 0 else NOP
-29      INT*         imm8                                   call an interrupt               UNDEFINED FOR NOW
-30      HLT*                                                halt                            halted flag <- 1
+29      INT*        imm8                                    call an interrupt               UNDEFINED FOR NOW
+30      HALT*                                               halt                            halted flag <- 1
 31      NOP                                                 no operation                    n/a
 
 ^ these instructions modify the flags register.
