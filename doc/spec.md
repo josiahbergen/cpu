@@ -1,7 +1,5 @@
 # JOKOR SPECIFICATION
 
----
-
 Meet the JOKOR: A custom CPU architecture design with a custom everything.
 
 ## Features
@@ -12,13 +10,65 @@ Meet the JOKOR: A custom CPU architecture design with a custom everything.
 - Memory banking
 - Device communication through built-in CPU instructions
 
+## Programming the JOKOR
+
+The JOKOR is programmed with `JASM`. JASM is a custom assembly language.
+
+It has a custom assembler that produces binaries unique to the JOKOR's architecture.
+
+## How to Run Your Code
+
+JASM files use the `.jasm` file extension. Compile your code with `python jasm.py hello.jasm -o hello.bin`.
+
+Once assembled to a binary file, run your code with `python emulator.py hello.bin`.
+
+## Instruction Set Reference
+
+| OPCODE | MNEMONIC | OPERAND 1          | OPERAND 2          | DESCRIPTION                  | OPERATION                                                |
+| ------ | -------- | ------------------ | ------------------ | ---------------------------- | -------------------------------------------------------- |
+| 0      | LOAD     | reg                | [imm16 \| reg:reg] | load 8-bit value from memory | reg <- [imm16 \| reg:reg]                                |
+| 1      | STORE    | reg                | [imm16 \| reg:reg] | store 8-bit value to memory  | [imm16 \| reg:reg] <- reg                                |
+| 2      | MOVE     | reg                | reg \| imm8        | move 8-bit value             | reg <- reg \| imm8                                       |
+| 3      | PUSH     | reg \| imm8        |                    | push to stack                | [SP--] <- imm8/reg \*note that the stack grows downwards |
+| 4      | POP      | reg                |                    | pop from stack               | reg <- [++SP] \*note that the stack grows down           |
+| 5      | ADD^     | reg                | reg \| imm8        | add                          | reg <- reg + (imm8 \| reg)                               |
+| 6      | ADDC^    | reg                | reg \| imm8        | add with carry               | reg <- reg + (imm8 \| reg)                               |
+| 7      | SUB^     | reg                | reg \| imm8        | subtract                     | reg <- reg - (imm8 \| reg)                               |
+| 8      | SUBB^    | reg                | reg \| imm8        | subract with borrow          | reg <- reg - (imm8 \| reg)                               |
+| 9      | INC      | reg                |                    | increment                    | reg <- reg + 1                                           |
+| 10     | DEC      | reg                |                    | decrement                    | reg <- reg - 1                                           |
+| 11     | SHL      | reg                | reg \| imm8        | bit shift left               | reg <- reg << (reg \| imm8)                              |
+| 12     | SHR      | reg                | reg \| imm8        | bit shift right              | reg <- reg >> (reg \| imm8)                              |
+| 13     | AND      | reg                | reg \| imm8        | bitwise and                  | reg <- reg AND (reg \| imm8)                             |
+| 14     | OR       | reg                | reg \| imm8        | bitwise or                   | reg <- reg OR (reg \| imm8)                              |
+| 15     | NOR      | reg                | reg \| imm8        | bitwise nor                  | reg <- reg NOR (reg \| imm8)                             |
+| 16     | NOT      | reg                |                    | bitwise not                  | reg <- reg NOR (reg \| imm8)                             |
+| 17     | XOR      | reg                | reg \| imm8        | bitwise xor                  | reg <- reg XOR (reg \| imm8)                             |
+| 18     | INB      | reg                | port(reg \| imm8)  | get byte from I/O port       | reg <- port(reg \| imm8)                                 |
+| 19     | OUTB     | reg                | port(reg \| imm8)  | send byte through I/O port   | port(reg \| imm8) <- reg                                 |
+| 20     | CMP^     | reg                | reg \| imm8        | compare                      | UNDEFINED FOR NOW                                        |
+| 21     | SEC      |                    |                    | set carry flag               | carry flag <- 1                                          |
+| 22     | CLC      |                    |                    | clear carry flag             | carry flag <- 0                                          |
+| 23     | CLZ      |                    |                    | clear zero flag              | zero flag <- 0                                           |
+| 24     | JMP      | [imm16]            |                    | unconditional jump           | PC <- [imm16 \| reg:reg]                                 |
+| 25     | JZ       | [imm16]            |                    | jump if zero                 | PC <- [imm16 \| reg:reg] if zero flag is 1 else NOP      |
+| 26     | JNZ      | [imm16]            |                    | jump of not zero             | PC <- [imm16 \| reg:reg] if zero flag is 0 else NOP      |
+| 27     | JC       | [imm16]            |                    | jump if carry                | PC <- [imm16 \| reg:reg] if carry flag is 1 else NOP     |
+| 28     | JNC      | [imm16]            |                    | jump if not carry            | PC <- [imm16 \| reg:reg] if carry flag is 0 else NOP     |
+| 29     | INT\*    | imm8               |                    | call an interrupt            | UNDEFINED FOR NOW                                        |
+| 30     | HALT\*   |                    |                    | halt                         | halted flag <- 1                                         |
+| 31     | NOP      |                    |                    | no operation                 | n/a                                                      |
+
+^ These instructions modify the flags register. <br>
+\* These instructions modify the status register.
+
 ## Instruction Format
 
 Instruction format is `AAAAA BBB` `CCCC DDDD` `EEEE EEEE*` `FFFFFFFF*` where:
 
 `AAAAA` is the instruction operand code and `BBB` is the addressing mode.
 
-`BBB` also defines what `CCCC`, `DDDD`, `EEEE EEEE`, and `FFFFFFFF` contain (or if they are utilized at all).
+`BBB` defines what `CCCC`, `DDDD`, `EEEE EEEE`, and `FFFFFFFF` contain (or if they are utilized at all).
 
 - `000`: No operands.
 - `001`: `CCCC` defines a single register argument. `DDDD EEEEEEEEE FFFFFFFF` are unused.
@@ -29,26 +79,22 @@ Instruction format is `AAAAA BBB` `CCCC DDDD` `EEEE EEEE*` `FFFFFFFF*` where:
 - `110`: `CCCC` defines a single register argument. `EEEE EEEE` defines a register pair which is interpreted as a memory location.
 - `111`: `CCCC DDDD` define a register pair. `EEEEEEEE FFFFFFFF` defines a 16-bit immediate.
 
-_\*These bytes are not in all instructions. See the table below._
-
-_NOTE: All 16-bit values are little-endian: `LLLLLLLL HHHHHHHH` if represented as an immediate, `L:H` if represented as a register pair._
+_\* These bytes are not in all instructions. See the table below._
 
 `BBB` also defines how many bytes an instruction takes up in memory:
 
-| Value | Length | Type           | Description                                 |
-| ----- | ------ | -------------- | ------------------------------------------- |
-| 000   | 1      | No operands    | _Really?_                                   |
-| 001   | 2      | REG            | Register                                    |
-| 010   | 3      | IMM8           | 8-bit Immediate                             |
-| 011   | 2      | REG, REG       | Register / Register                         |
-| 100   | 3      | REG, IMM8      | Register / 8-bit Immediate                  |
-| 101   | 4      | REG, [IMM16]   | Register / Address as 16-bit Immediate      |
-| 110   | 3      | REG, [REG:REG] | Register / Address as Register Pair         |
-| 111   | 4      | REG:REG, IMM16 | Register Pair / Address as 16-bit Immediate |
+| Value | Length | Type           | Description                                  |
+| ----- | ------ | -------------- | -------------------------------------------- |
+| 000   | 1      | No operands    | _Really?_                                    |
+| 001   | 2      | REG            | Register                                     |
+| 010   | 3      | IMM8           | 8-bit Immediate                              |
+| 011   | 2      | REG, REG       | Register / Register                          |
+| 100   | 3      | REG, IMM8      | Register / 8-bit Immediate                   |
+| 101   | 4      | REG, [IMM16]   | Register / Address as 16-bit Immediate*      |
+| 110   | 3      | REG, [REG:REG] | Register / Address as Register Pair*         |
+| 111   | 4      | [IMM16]        | Address as 16-bit Immediate*                 |
 
-## Instruction Set
-
-See the [Language Specification](jasm.md) for more details.
+_\* All 16-bit values are little-endian: `LLLLLLLL HHHHHHHH` if represented as an immediate, `L:H` if represented as a register pair._
 
 ## Registers
 
@@ -83,7 +129,7 @@ The bytes of the Flags register is defined as follows:
 1: Zero
 2: Negative
 3: Overflow
-5-7: (reserved for future use)
+Bytes 5-7 are reserved for future use.
 ```
 
 ### Status Register
@@ -93,7 +139,7 @@ The bytes of the Status register is defined as follows:
 ```
 0: Error
 1: Halted
-2-7: Undefined (reserved for future use)
+Bytes 2-7 are reserved for future use.
 ```
 
 ## Memory Layout

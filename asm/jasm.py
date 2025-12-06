@@ -24,6 +24,9 @@ def parse(file):
 
 
 def assemble(file, output):
+
+    logger.info(f"Assembling {file}...")
+
     # Parse the source file
     tree = parse(file)
     
@@ -38,6 +41,8 @@ def assemble(file, output):
         f.write(binary)
     
     logger.debug(f"Generated {len(binary)} bytes of binary code.")
+
+    return len(binary)
 
 def main():
     argparser = argparse.ArgumentParser(description="JASM assembler")
@@ -63,18 +68,21 @@ def main():
         exit(1)
 
     # check if file is an assembly file
-    if not args.file.endswith(".asm"):
-        logger.error(f"File {args.file} is not an assembly file. Exiting...")
+    if not args.file.endswith(".jasm"):
+        logger.error(f"File {args.file} is not a JASM file. Exiting...")
         exit(1)
     
     logger.debug("Init looks good. Starting assembly...")
 
     # the magic
-    assemble(args.file, args.output)
+    size = assemble(args.file, args.output)
 
     if logger.level == Logger.Level.DEBUG:
+        logger.flush_debug()
         logger.info("")
-    logger.info(f"Created binary file: {args.output}")
+    logger.info(f"Wrote {size} bytes to {args.output}.")
+    logger.success("Assembly complete! Yay!")
+    logger.info("")
 
     exit(0)
 

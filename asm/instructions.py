@@ -76,7 +76,7 @@ ADDRESSING_MODES = {
     "REGISTER_IMM8": 4,
     "REGISTER_IMM16_ADDRESS": 5,
     "REGISTER_REGPAIR_ADDRESS": 6,
-    "REGPAIR_IMM16": 7,
+    "IMM16": 7,
 }
 
 ADDRESSING_MODE_TO_SIZE = {
@@ -87,8 +87,15 @@ ADDRESSING_MODE_TO_SIZE = {
     ADDRESSING_MODES["REGISTER_IMM8"]: 3,
     ADDRESSING_MODES["REGISTER_IMM16_ADDRESS"]: 4,
     ADDRESSING_MODES["REGISTER_REGPAIR_ADDRESS"]: 3,
-    ADDRESSING_MODES["REGPAIR_IMM16"]: 4,
+    ADDRESSING_MODES["IMM16"]: 4,
 }
+
+def get_operands(node):
+    # safely get operands
+    if len(node.children) > 1 and node.children[1].data == "operand_list":
+        return node.children[1].children
+    else:
+        return []
 
 def validate_instruction_semantics(node, logger):
     """
@@ -113,49 +120,46 @@ def validate_instruction_semantics(node, logger):
     line = node.children[0].line
 
     # Handle optional operand_list
-    if len(node.children) > 1 and node.children[1].data == "operand_list":
-        operands = node.children[1].children
-    else:
-        operands = []
+    operands = get_operands(node)
     optypes = [OPERAND_TYPES[op.type] for op in operands]
 
     match (mnemonic):
         case "SEC" | "CLC" | "CLZ" | "HALT" | "NOP":
             # 0 operands
             validate_num_operands(0, len(optypes), mnemonic, line)
-            logger.debug(f"Validated instruction semantics for {mnemonic} on line {line}: 0 operands")
+            logger.debug(f"    Validated instruction semantics for {mnemonic} on line {line}: 0 operands")
         case "INT":
             # 1 operand (number)
             validate_num_operands(1, len(optypes), mnemonic, line)
             validate_operand_type(optypes[0], 0, [OPERAND_TYPES["NUMBER"]], mnemonic, line)
-            logger.debug(f"Validated instruction semantics for {mnemonic} on line {line}: 1 operand (number)")
+            logger.debug(f"    Validated instruction semantics for {mnemonic} on line {line}: 1 operand (number)")
         case "POP" | "INC" | "DEC" | "NOT":
             # 1 operand (register)
             validate_num_operands(1, len(optypes), mnemonic, line)
             validate_operand_type(optypes[0], 0, [OPERAND_TYPES["REGISTER"]], mnemonic, line)
-            logger.debug(f"Validated instruction semantics for {mnemonic} on line {line}: 1 operand (register)")
+            logger.debug(f"    Validated instruction semantics for {mnemonic} on line {line}: 1 operand (register)")
         case "PUSH":
             # 1 operand (register or number)
             validate_num_operands(1, len(optypes), mnemonic, line)
             validate_operand_type(optypes[0], 0, [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"]], mnemonic, line)
-            logger.debug(f"Validated instruction semantics for {mnemonic} on line {line}: 1 operand (register/number)")
+            logger.debug(f"    Validated instruction semantics for {mnemonic} on line {line}: 1 operand (register/number)")
         case "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
             # 1 operand (labelname, number or register pair)
             validate_num_operands(1, len(optypes), mnemonic, line)
             validate_operand_type(optypes[0], 0, [OPERAND_TYPES["LABELNAME"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER_PAIR"]], mnemonic, line)
-            logger.debug(f"Validated instruction semantics for {mnemonic} on line {line}: 1 operand (labelname/number/register pair)")
+            logger.debug(f"    Validated instruction semantics for {mnemonic} on line {line}: 1 operand (labelname/number/register pair)")
         case "MOVE" | "ADD" | "ADDC" | "SUB" | "SUBB" | "SHL" | "SHR" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "OUTB" | "CMP":
             # 2 operands (register, register or number)
             validate_num_operands(2, len(optypes), mnemonic, line)
             validate_operand_type(optypes[0], 0, [OPERAND_TYPES["REGISTER"]], mnemonic, line)
             validate_operand_type(optypes[1], 1, [OPERAND_TYPES["REGISTER"], OPERAND_TYPES["NUMBER"]], mnemonic, line)
-            logger.debug(f"Validated instruction semantics for {mnemonic} on line {line}: 2 operands (register, register/number)")
+            logger.debug(f"    Validated instruction semantics for {mnemonic} on line {line}: 2 operands (register, register/number)")
         case "LOAD" | "STORE":
             # 2 operands (register, number or register pair)
             validate_num_operands(2, len(optypes), mnemonic, line)
             validate_operand_type(optypes[0], 0, [OPERAND_TYPES["REGISTER"]], mnemonic, line)
             validate_operand_type(optypes[1], 1, [OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER_PAIR"]], mnemonic, line)
-            logger.debug(f"Validated instruction semantics for {mnemonic} on line {line}: 2 operands (register, number/register pair)")
+            logger.debug(f"    Validated instruction semantics for {mnemonic} on line {line}: 2 operands (register, number/register pair)")
         case _:
             logger.error(f"Unknown instruction: {mnemonic} on line {line}")
             exit(1)
@@ -197,27 +201,21 @@ def get_addressing_mode(mnemonic, operands):
                 return ADDRESSING_MODES["REGISTER_REGPAIR_ADDRESS"]
             return ADDRESSING_MODES["REGISTER_IMM16_ADDRESS"]
         
-        # 16-bit immediate or register pair memory address
+        # 16-bit immediate memory address
         case "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
-            if len(optypes) > 0 and optypes[0] == OPERAND_TYPES["REGISTER_PAIR"]:
-
-                # register + register pair interpreted as memory address
-                # the register is unused in this case
-                return ADDRESSING_MODES["REGISTER_REGPAIR_ADDRESS"]
-
-            # For NUMBER or LABELNAME (resolved to imm16), use mode register pair + 16-bit immediate
-            # the register pair is unused in this case
-            return ADDRESSING_MODES["REGPAIR_IMM16"]
+            return ADDRESSING_MODES["IMM16"]
         
         case _:
             return None
 
 
-def get_instruction_size(mnemonic, operands):
+def get_instruction_size(mnemonic, operands, logger):
  
     mnemonic = mnemonic.upper()
 
     addressing_mode = get_addressing_mode(mnemonic, operands)
+    logger.debug(f"    Instruction size for {mnemonic} defined as {ADDRESSING_MODE_TO_SIZE[addressing_mode]}")
     if addressing_mode is None:
         return None
     return ADDRESSING_MODE_TO_SIZE[addressing_mode]
+    
