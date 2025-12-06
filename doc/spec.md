@@ -11,95 +11,43 @@ Meet the JOKOR.
 
 ## Instruction Layout
 
-Instruction format is `XXXX  Y  ZZZ` where:
+Instruction format is `AAAAAA BC` `DDDD EEEE` `FFFFFFFF?` `GGGGGGGG?` where:
 
-- XXXX is the instruction operand code.
-- Y defines whether to use immediate or register value
-- ZZZ defines the register referenced in the first operand (if applicable)
+- `AAAAAA` is the instruction operand code.
 
-If there is a second reg operand, it is contained in the first three bits of the second instruction byte.
+- `BC` defines immediate/addressing mode flags.
 
-> There is never more than one choice between imm/reg per instruction. The opcode will encode if whether this choice affects the first or second operand.
+- If `BC` is `00`, no immediate is used. `DDDD` defines the first register argument. `EEEE` defines the second register argument. If there is only one register argument, `EEEE` is unused. `FFFFFFFF` and `GGGGGGGG` are unused.
 
-```
-operation, reg        ->  one byte. register is encoded within.
-operation, imm8       ->  two bytes. imm8 is the byte after the instruction byte.
-operation, reg, imm8  ->  two bytes. reg is encoded within the first byte, imm8 is the second.
-operation, reg, reg   ->  two bytes. reg is encoded within the first byte and the first three bits of the second.
-operation, reg, imm16 ->  three bytes. reg is encoded within the first byte and the imm16 is the next two.
-operation, imm16, reg ->  three bytes. reg is encoded within the first byte and the imm16 is the next two.
-operation, reg, reg/reg ->  three bytes. reg is encoded within the first byte and reg/reg is the first six bytes of the second.
+- If `BC` is `01`, an 8-bit immediate follows. `DDDD` defines the register argument. `FFFFFFFF` is the 8-bit immediate. `GGGGGGGG` is unused.
 
-```
+- If `BC` is `10`, a 16-bit immediate follows. `DDDD EEEE` defines a register pair argument as `DDDD:EEEE (H:L)`. The immediate is in `FFFFFFFF GGGGGGGG` (little-endian). 
 
-## Instruction Set
+- If `BC` is `11`, an absolute 16-bit memory address follows. `DDDD` defines a register argument.  `FFFFFFFF GGGGGGGG` defines a 16-bit memory address.
 
-```
-0x0: LOAD reg, imm16/XY -> reg = [imm16 or XY]
-Load the byte at address imm16 or at address in register pair XY into reg.
 
-0x1: MOVE reg, imm8/reg -> reg = (imm8 or reg)
-Move the value from imm8 or another register into reg.
+### Instructions
 
-0x2: STORE imm16/XY, reg -> [imm16 or XY] = reg
-Store the value in reg into RAM at address imm16 or at address in register pair XY.
-
-0x3: PUSH reg/imm8 -> push(reg or imm8)
-Push the value in reg or an 8-bit immediate onto the stack.
-
-0x4: POP reg -> reg = pop()
-Pop the top of the stack into reg.
-
-0x5: ADD reg, reg/imm8 -> reg = reg + (reg or imm8)
-Add a register or 8-bit immediate to reg. Result stored in reg.
-This instruction modifies the Carry and Overflow flags.
-In the event of an overflow, the result will wrap around modulo 256
-
-0x6: SUB reg, reg/imm8 -> reg = reg - (reg or imm8)
-Subtract a register or 8-bit immediate from reg. Result stored in reg.
-This instruction modifies the Zero flag.
-
-0x7: SHL reg, reg/imm8 -> reg = reg << (reg or imm8)
-Logical shift reg left by the amount in reg or imm8.
-
-0x8: SHR reg, reg/imm8 -> reg = reg >> (reg or imm8)
-Logical shift reg right by the amount in reg or imm8.
-
-0x9: AND reg, reg/imm8 -> reg = reg & (reg or imm8)
-Bitwise AND reg with reg or imm8. Result stored in reg.
-
-0xA: OR  reg, reg/imm8 -> reg = reg | (reg or imm8)
-Bitwise OR reg with reg or imm8. Result stored in reg.
-
-0xB: NOR reg, reg/imm8 -> reg = ~(reg | (reg or imm8))
-Bitwise NOR reg with reg or imm8. Result stored in reg.
-
-0xC: INB reg, port(reg/imm8) -> reg = IO[(reg or imm8)]
-Read an 8-bit value from an I/O port into reg.
-
-0xD: OUTB port(reg/imm8), reg  -> IO[(reg or imm8)] = reg
-Write reg to an I/O port.
-
-0xE: CMP reg, reg/imm8 -> flags = reg - (reg or imm8)
-Compare reg with reg or imm8. Updates flags only.
-
-0xF: JNZ imm16/XY -> if (Z==0) PC = (imm16 or regpair)
-Jump to imm16 or the address in  if zero flag is not set.
-```
+See inst.txt for the list of instructions.
 
 ## Registers
 
 There are four 8-bit general purpose registers:
 
-    A: General purpose / accumulator
-    B: General purpose
-    X: Low address / general purpose
-    Y: High address / general purpose
+```
+A: General purpose / accumulator
+B: General purpose
+C: General purpose
+D: General purpose
+X: Low address / general purpose
+Y: High address / general purpose
+```
 
 There are five memory-mapped registers (see [Memory Layout](#Memory%20Layout))
 
 ```
 F: Flags
+STS: Status register
 Z: Zero register
 PC: Program Counter (read-only)
 SP: Stack Pointer
@@ -108,17 +56,29 @@ MB: Memory Bank
 
 ### Flags Register
 
-The Flags register is defined as follows:
+The bytes of the Flags register is defined as follows:
 
 ```
 0: Carry
 1: Zero
 2: Negative
 3: Overflow
-4-7: Undefined (reserved for future use)
+5-7: Undefined (reserved for future use)
+```
+
+### Status Register
+
+The bytes of the Status register is defined as follows:
+
+```
+0: Error
+1: Halted
+2-7: Undefined (reserved for future use)
 ```
 
 ## Memory Layout
+
+Total memory: `64Kib`
 
 The memory layout is as follows:
 
@@ -144,7 +104,3 @@ The memory layout is as follows:
 ## Ports
 
 Ports can be used to interact with I/O devices.
-
-### Special Ports
-
-Port `0x00` can be used to interact with the status of the computer.

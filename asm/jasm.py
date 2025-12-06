@@ -223,8 +223,7 @@ def assemble(file, output):
     # lexer and parser
     tree = parse(file)
 
-    print(tree.pretty())
-
+    
     # pass 1: label resolution
     logger.debug("Resolving labels...")
     labels = {}
