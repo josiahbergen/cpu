@@ -36,8 +36,7 @@ GRAMMAR = r"""
     ?start: line*
 
     ?line: instr
-        | label
-        | COMMENT
+         | label
 
     label: LABELNAME ":"
 
@@ -45,30 +44,29 @@ GRAMMAR = r"""
 
     operand_list: operand ("," operand)*
 
-    ?operand: REGISTER
+    ?operand: REGISTER_PAIR
+            | REGISTER
             | NUMBER
             | LABELNAME
 
     COMMENT: /;.*/
 
-    REGISTER: /(A|B|X|Y|XY|SP|PC|Z|F)\b/i
-    MNEMONIC: /(LOAD|MOVE|MOV|STORE|PUSH|POP|ADD|SUB|SHL|SHR|AND|OR|NOR|INB|OUTB|CMP|JNZ)\b/i
+    # priorities for token matching
+    # higher number = higher priority
+    MNEMONIC.100: /(LOAD|MOVE|MOV|STORE|PUSH|POP|ADD|SUB|SHL|SHR|AND|OR|NOR|INB|OUTB|CMP|JNZ|HLT)\b/i
+    REGISTER_PAIR.90: /(A|B|C|D|X|Y|SP|PC|Z|F):(A|B|C|D|X|Y|SP|PC|Z|F)/i
+    REGISTER.80: /(A|B|C|D|X|Y|SP|PC|Z|F)\b/i
+    LABELNAME.10: /[A-Za-z_][A-Za-z0-9_]*/
 
-    # Binary: b01011 or B01011
-    # Hex: 0x10 or 0X10
-    # Decimal: 10
-    NUMBER: /0[xX][0-9a-fA-F]+/ 
-        | /[bB][01]+/
-        | /[0-9]+/
+    NUMBER: /0[xX][0-9a-fA-F]+/
+          | /[bB][01]+/
+          | /[0-9]+/
 
-    # Label names
-    LABELNAME: /[A-Za-z_][A-Za-z0-9_]*/
-
-    # Lark provides handy predefined tokens for whitespace
     %import common.WS
     %ignore WS
     %ignore COMMENT
 """
+
 
 OPERAND_TYPES = {
     "name_operand": "name",

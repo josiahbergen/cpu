@@ -41,15 +41,17 @@ REGISTERS = {
 }
 
 OPERAND_TYPES = {
-    "REGISTER": 0,
+    "LABELNAME": 0,
     "NUMBER": 1,
-    "LABELNAME": 2
+    "REGISTER": 2,
+    "REGISTER_PAIR": 3,
 }
 
 OPERAND_TYPE_TO_STRING = {
-    OPERAND_TYPES["REGISTER"]: "REGISTER",
+    OPERAND_TYPES["LABELNAME"]: "LABELNAME",
     OPERAND_TYPES["NUMBER"]: "NUMBER",
-    OPERAND_TYPES["LABELNAME"]: "LABELNAME"
+    OPERAND_TYPES["REGISTER"]: "REGISTER",
+    OPERAND_TYPES["REGISTER_PAIR"]: "REGISTER_PAIR"
 }
 
 def parse(file):
@@ -62,6 +64,7 @@ def parse(file):
         exit(1)
 
     return tree
+
 
 def validate_instruction_semantics(node):
 
@@ -165,51 +168,36 @@ def get_instruction_size(mnemonic, operands):
     match (mnemonic):
         case "LOAD":
             return 3
-
         case "MOVE":
             return 2
-
         case "STORE":
             return 3
-
         case "PUSH":
             if optypes[0] == OPERAND_TYPES["NUMBER"]:
                 return 2
             return 1
-
         case "POP":
             return 1
-
         case "ADD":
             return 2
-
         case "SUB":
             return 2
-
         case "SHL":
             return 2
-
         case "SHR":
             return 2
-
         case "AND":
             return 2
-
         case "OR":
             return 2
-
         case "NOR":
             return 2
-
         case "INB":
             return 2
-
         case "OUTB":
             return 2
-
         case "CMP":
             return 2
-
         case "JNZ":
             if optypes[0] == OPERAND_TYPES["NUMBER"]:
                 return 3
@@ -217,6 +205,7 @@ def get_instruction_size(mnemonic, operands):
         case _:
             logger.error(f"Unknown instruction: {mnemonic}")
             exit(1)
+
 
 def assemble(file, output):
 

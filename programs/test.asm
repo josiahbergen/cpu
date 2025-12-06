@@ -1,3 +1,3 @@
 start:
-    MOVE A, 0xA
-
+    MOVE A, 0x10
+    HALT
