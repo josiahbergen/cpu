@@ -1,7 +1,7 @@
 {
     "files.exclude": {
         "uv.lock": true,
-        ".gitignore": true,
+        ".gitignore": false,
         ".vscode": true
     }
 }
