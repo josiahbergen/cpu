@@ -1,0 +1,6 @@
+; Simple JASM program to calculate the 10th Fibonacci number
+
+start:
+    MOVE A, 0xFF
+    STORE A, 0xC000
+    HALT

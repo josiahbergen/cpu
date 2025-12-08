@@ -48,12 +48,12 @@ def main():
     argparser = argparse.ArgumentParser(description="JASM assembler")
     argparser.add_argument("file", nargs="?", default="", help="The file to assemble")
     argparser.add_argument("-o", "--output", default="a.bin", help="The output file")
-    argparser.add_argument("-d", "--debug", action="store_true", help="Debug output")
+    argparser.add_argument("-v", "--verbosity", help="Verbosity level", default=Logger.Level.INFO, type=int)
     args = argparser.parse_args()
 
     # initialize logger
     global logger
-    logger = Logger(Logger.Level.DEBUG if args.debug else Logger.Level.INFO)
+    logger = Logger(args.verbosity)
     logger.title("JASM Assembler v1.0")
     logger.info("")
 

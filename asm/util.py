@@ -1,53 +1,6 @@
 import colorama
 import sys
 
-class Logger: 
-    class Level:
-        DEBUG = "debug"
-        INFO = "info"
-        ERROR = "error"
-
-    def __init__(self, level):
-        colorama.init()
-        self.level = level
-        self.debug_buffer = []
-        self.debug_count = 0
-        self.flush_interval = 100
-
-    def debug(self, message):
-        if self.level == self.Level.DEBUG:
-            formatted_message = colorama.Fore.YELLOW + "[DEBUG] " + colorama.Fore.RESET + message
-            self.debug_buffer.append(formatted_message)
-            self.debug_count += 1
-            
-            if self.debug_count >= self.flush_interval:
-                self.flush_debug()
-
-    def flush_debug(self):
-        if self.debug_buffer:
-            for msg in self.debug_buffer:
-                print(msg, flush=False)
-            sys.stdout.flush()  # Flush stdout after all buffered messages
-            self.debug_buffer.clear()
-            self.debug_count = 0
-
-    def small(self, message):
-        print(colorama.Fore.BLACK + message + colorama.Fore.RESET)
-
-    def info(self, message):
-        print(colorama.Fore.RESET + message + colorama.Fore.RESET)
-
-    def error(self, message):
-        self.flush_debug()
-        print(colorama.Fore.RED + "ERROR: " + message + colorama.Fore.RESET)
-
-    def success(self, message):
-        print(colorama.Back.GREEN + colorama.Fore.BLACK + message + colorama.Fore.RESET + colorama.Back.RESET)
-
-    def title(self, message):
-        print(colorama.Back.BLUE + colorama.Fore.BLACK + message + colorama.Fore.RESET + colorama.Back.RESET)
-
-
 # EBNF-like grammar.
 GRAMMAR = r"""
     ?start: line* # Programs must begin with a start label
@@ -90,3 +43,63 @@ GRAMMAR = r"""
     %ignore WS
     %ignore COMMENT
 """
+
+class Logger: 
+    class Level:
+        VERBOSE = 3
+        DEBUG = 2
+        INFO = 1
+        ERROR = 0
+
+    def __init__(self, level):
+        colorama.init()
+        self.level = level
+        self.debug_buffer = []
+        self.debug_count = 0
+        self.flush_interval = 0
+
+    def verbose(self, message):
+        if self.level >= self.Level.VERBOSE:
+            formatted_message = colorama.Fore.YELLOW + "[DEBUG] " + colorama.Fore.RESET + message
+            self.debug_buffer.append(formatted_message)
+            self.debug_count += 1
+            
+            if self.debug_count >= self.flush_interval:
+                self.flush_debug()
+
+    def debug(self, message):
+        if self.level >= self.Level.DEBUG:
+            formatted_message = colorama.Fore.YELLOW + "[DEBUG] " + colorama.Fore.RESET + message
+            self.debug_buffer.append(formatted_message)
+            self.debug_count += 1
+            
+            if self.debug_count >= self.flush_interval:
+                self.flush_debug()
+
+    def flush_debug(self):
+        if self.debug_buffer:
+            for msg in self.debug_buffer:
+                print(msg, flush=False)
+            sys.stdout.flush()  # Flush stdout after all buffered messages
+            self.debug_buffer.clear()
+            self.debug_count = 0
+
+    def small(self, message):
+        if self.level >= self.Level.INFO:
+            print(colorama.Fore.BLACK + message + colorama.Fore.RESET)
+
+    def info(self, message):
+        if self.level >= self.Level.INFO:
+            print(colorama.Fore.RESET + message + colorama.Fore.RESET)
+
+    def error(self, message):
+        self.flush_debug()
+        print(colorama.Fore.RED + "ERROR: " + message + colorama.Fore.RESET)
+
+    def success(self, message):
+        if self.level >= self.Level.INFO:   
+            print(colorama.Back.GREEN + colorama.Fore.BLACK + message + colorama.Fore.RESET + colorama.Back.RESET)
+
+    def title(self, message):
+        if self.level >= self.Level.INFO:
+            print(colorama.Back.BLUE + colorama.Fore.BLACK + message + colorama.Fore.RESET + colorama.Back.RESET)

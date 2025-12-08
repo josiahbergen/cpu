@@ -16,11 +16,33 @@ The JOKOR is programmed with `JASM`. JASM is a custom assembly language.
 
 It has a custom assembler that produces binaries unique to the JOKOR's architecture.
 
+At this time, JASM does not support macros or imports, although it is planned to. However, all basic assembly functions are available, including labels, comments, and support for all 31 instructions. 
+
+The full Lark grammar used for lexical analysis is contained in [asm/util.py](../asm/util.py).
+
 ## How to Run Your Code
 
 JASM files use the `.jasm` file extension. Compile your code with `python jasm.py hello.jasm -o hello.bin`.
 
 Once assembled to a binary file, run your code with `python emulator.py hello.bin`.
+
+## Emulator
+
+The emulator allows you to run compiled binaries and inspect the CPU state.
+
+Usage: `python emulator.py [binary]`
+
+REPL commands:
+- `load <path>`: Load a binary file into memory
+- `step`: Execute one instruction
+- `cont`: Continue execution until a breakpoint or halt
+- `run`: Run until halt
+- `break <hex>`: Set a breakpoint at address
+- `regs`: Display register values
+- `mem <hex> <len>`: Display memory contents
+- `disasm [addr]`: Disassemble instruction at address (or PC)
+- `ports`: Display non-zero port values
+- `quit`: Exit the emulator
 
 ## Instruction Set Reference
 
@@ -77,7 +99,7 @@ Instruction format is `AAAAA BBB` `CCCC DDDD` `EEEE EEEE*` `FFFFFFFF*` where:
 - `100`: `CCCC` defines a register argument. `EEEEEEE` defines an 8-bit immediate. `DDDD` is unused.
 - `101`: `CCCC` defines a single register argument. `EEEEEEEE FFFFFFFF` defines a memory location. `DDDD` is unused.
 - `110`: `CCCC` defines a single register argument. `EEEE EEEE` defines a register pair which is interpreted as a memory location.
-- `111`: `CCCC DDDD` define a register pair. `EEEEEEEE FFFFFFFF` defines a 16-bit immediate.
+- `111`: `EEEEEEEE FFFFFFFF` defines a 16-bit immediate. `CCCC DDDD` are unused.
 
 _\* These bytes are not in all instructions. See the table below._
 
@@ -167,4 +189,4 @@ _\*\* The stack grows downwards. It is recommended that SP = 0xFEFF._
 
 ## Ports
 
-Ports can be used to interact with I/O devices.
+Ports can be used to interact with I/O devices. The INB and OUTB exist to facilitate this. The JOKOR supports up to 256 I/O devices. 

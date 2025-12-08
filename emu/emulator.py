@@ -128,8 +128,8 @@ class CPU:
 
     def decode(self):
         first = self.fetch_byte()
-        opcode = (first >> 2) & 0x3F
-        mode = first & 0x03
+        opcode = (first >> 3) & 0b11111
+        mode = first & 0b111
 
         if mode == MODE_NO_IMM:
             d = self.fetch_byte()
@@ -157,7 +157,7 @@ class CPU:
             addr = (hi<<8) | lo
             return (opcode, mode, reg_d, addr)
         else:
-            raise RuntimeError("invalid mode")
+            raise RuntimeError(f"invalid mode {mode} at 0x{self.PC:04X}")
 
     # ---------------- reg helpers ----------------
     def reg_get(self, code:int) -> int:
@@ -550,7 +550,8 @@ class CPU:
             self.PC = addr
         elif mode == MODE_PAIR16:
             _, _, reg_h, reg_l, _ = decoded
-            hi = self.reg_get(reg_h); lo = self.reg_get(reg_l)
+            hi = self.reg_get(reg_h)
+            lo = self.reg_get(reg_l)
             self.PC = (hi<<8)|lo
         else:
             raise RuntimeError("JMP expects pair16 or abs16")
@@ -596,20 +597,26 @@ class CPU:
     # ---------------- disasm helper ----------------
     def disasm_at(self, addr:int) -> str:
         b0 = self.read_u8(addr)
-        opcode = (b0>>2)&0x3F
-        mode = b0 & 0x03
-        return f"0x{addr:04X}: OPC=0x{opcode:02X} MODE={mode}"
+        opcode = (b0>>3) & 0b11111
+        mode = b0 & 0b111
+        return f"0x{addr:04X}: OP=0x{opcode:02X} MODE={mode}"
 
     # ---------------- REPL ----------------
     def repl(self):
-        print("JOKOR Emulator REPL. commands: load <path>, step, cont, run, break <hex>, regs, mem <hex> <len>, disasm <addr>, ports, quit")
+        print("Type help for a list of commands.")
         while True:
+
             try:
                 cmd = input("(emu) ").strip().split()
             except EOFError:
                 break
-            if not cmd: continue
-            c = cmd[0]
+            except KeyboardInterrupt:
+                print("\nbye")
+                break
+
+            if not cmd: 
+                continue
+            c = cmd[0].lower()
             try:
                 if c == "load":
                     if len(cmd)<2:
@@ -617,21 +624,26 @@ class CPU:
                         continue
                     with open(cmd[1],"rb") as fh:
                         self.load_program(fh.read())
+                
                 elif c == "step":
                     res = self.step()
-                    if res: print(res)
+                    if res: 
+                        print(res)
+                
                 elif c == "cont":
                     while True:
                         res = self.step()
                         if res:
                             print(res)
                             break
+                
                 elif c == "run":
                     while True:
                         res = self.step()
                         if res:
                             print(res)
                             break
+                
                 elif c == "break":
                     if len(cmd)<2:
                         print("usage: break <hex>")
@@ -639,11 +651,13 @@ class CPU:
                     addr = int(cmd[1],16)
                     self.breakpoints.add(addr)
                     print(f"breakpoint set @ 0x{addr:04X}")
+                
                 elif c == "regs":
-                    print(f"PC=0x{self.PC:04X} SP=0x{self.SP:04X} F=0x{self.F:02X} STS=0x{self.STS:02X}")
+                    print(f"PC: 0x{self.PC:04X} SP: 0x{self.SP:04X} F: 0x{self.F:02X} STS: 0x{self.STS:02X}")
                     for k in REG_INDEX:
-                        print(f" {k}=0x{self.reg[k]:02X}", end="")
+                        print(f"{k}: 0x{self.reg[k]:02X} ", end="")
                     print()
+                
                 elif c == "mem":
                     if len(cmd)<3:
                         print("usage: mem <hexaddr> <len>")
@@ -651,21 +665,41 @@ class CPU:
                     addr = int(cmd[1],16)
                     ln = int(cmd[2])
                     chunk = bytes(self.memory[addr:addr+ln])
-                    print(chunk.hex())
+                    for i in range(0, len(chunk), 16):
+                        print(f"0x{i:04X} | ", end="")
+                        for i in range(i, i + 16):
+                            print(f"{chunk[i]:02X}".lower(), end=" ")
+                        print()
+                
                 elif c == "disasm":
                     if len(cmd)<2:
                         print(self.disasm_at(self.PC))
                     else:
                         addr = int(cmd[1],16)
                         print(self.disasm_at(addr))
+                
                 elif c == "ports":
                     print("ports (nonzero):")
                     for i,v in enumerate(self.ports):
                         if v!=0:
                             print(f" {i:02X}: {v:02X}")
+                
                 elif c == "quit":
                     print("bye")
                     break
+
+                elif c == "help":
+                    print("help: Display this help message")
+                    print("load <path>: Load a binary file into memory")
+                    print("step: Execute one instruction")
+                    print("cont: Continue execution until a breakpoint or halt")
+                    print("run: Run until halt")
+                    print("break <hex>: Set a breakpoint at address")
+                    print("regs: Display register values")
+                    print("mem <hex> <len>: Display memory contents")
+                    print("disasm [addr]: Disassemble instruction at address (or PC)")
+                    print("ports: Display non-zero port values")
+                    print("quit: Exit the emulator")
                 else:
                     print("unknown command", c)
             except Exception as e:

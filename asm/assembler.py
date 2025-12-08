@@ -53,9 +53,9 @@ def resolve_labels(tree, logger):
                 logger.error(f"Bad instruction: {mnemonic} on line {node.children[0].line}")
                 exit(1)
             pc += size
-            logger.debug(f"    Finished processing instruction {mnemonic} at PC={pc-size}, size={size} bytes")
+            logger.verbose(f"    Finished processing instruction {mnemonic} at PC={pc-size}, size={size} bytes")
 
-    logger.debug(f"Finished resolving labels. Total labels: {len(labels)}")
+    logger.debug(f"Finished resolving {len(labels)} labels:")
     for label, address in labels.items():
         logger.debug(f"    {label} = {address}")
 
@@ -124,7 +124,7 @@ def get_operand_value(operand, labels, logger):
         logger.error(f"Unknown operand: {operand.value.strip()}")
         exit(1)
 
-    logger.debug(f"    Encoded {operand.type} value as {value} for operand {operand.value.strip()}")
+    logger.verbose(f"    Encoded {operand.type} value as {value} for operand {operand.value.strip()}")
     return value
 
 
@@ -134,6 +134,10 @@ def get_bytearray_bits_string(bytearray):
         string += f"{byte:08b} "
     return string
 
+def get_byte1_bits_string(byte):
+    opcode_bits = (byte >> 3) & 0b11111
+    addressing_mode_bits = byte & 0b111
+    return f"{opcode_bits:05b} {addressing_mode_bits:03b} | {opcode_bits:<5} {addressing_mode_bits:<3} |"
 
 def assert_operand_count(expected, actual, logger):
     if expected != actual:
@@ -155,11 +159,13 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
     # AAAAA is the opcode
     # BBB is the addressing mode
 
-    opcode_bits = opcode & 0b11111 << 5
-    addressing_mode_bits = addressing_mode & 0b111
+    opcode_bits = (opcode & 0b11111) << 3
+    addressing_mode_bits = (addressing_mode & 0b111)
     byte_1 = opcode_bits | addressing_mode_bits
     binary.append(byte_1)
-    logger.debug(f"    Generated first byte: {byte_1:08b}   (instruction: {opcode:05b}, addressing mode: {addressing_mode:03b})")
+
+    logger.verbose(f"    Generated first byte: {byte_1:08b} "
+                   f"| {get_byte1_bits_string(byte_1)}")
 
     # this is where the "simple" part ends
     # see the instruction format section in spec.md for more details on the addressing modes
@@ -172,7 +178,7 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
             assert_operand_count(1, len(operands), logger)
             # the first register is encoded in the high 4 bits of the byte
             byte_2 = (operands[0] & 0b00001111) << 4
-            logger.debug(f"    Generated second byte: {byte_2:08b}  (register: {operands[0]:04b})")
+            logger.verbose(f"    Generated second byte: {byte_2:08b}  (register: {operands[0]:04b})")
             binary.append(byte_2)
 
         case 2: # single 8-bit immediate operand
@@ -180,40 +186,40 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
             assert_immediate_size(8, operands[0], logger)
             # second byte is unused
             binary.append(0b00000000)
-            logger.debug(f"    Generated second byte: {0b00000000:08b}  (unused)")
+            logger.verbose(f"    Generated second byte: {0b00000000:08b}  (unused)")
             byte_3 = operands[0]
-            logger.debug(f"    Generated third byte: {byte_3:08b}   (imm8: {operands[0]:08b})")
+            logger.verbose(f"    Generated third byte: {byte_3:08b}   (imm8: {operands[0]:08b})")
             binary.append(byte_3)
 
         case 3: # two register operands
             assert_operand_count(2, len(operands), logger)
             byte_2 = (operands[0] & 0b00001111) << 4 | (operands[1] & 0b00001111)
-            logger.debug(f"    Generated second byte: {byte_2:08b}  (register: {operands[0]:04b}, register: {operands[1]:04b})")
+            logger.verbose(f"    Generated second byte: {byte_2:08b}  (register: {operands[0]:04b}, register: {operands[1]:04b})")
             binary.append(byte_2)
 
         case 4: # register and 8-bit immediate operand
             assert_operand_count(2, len(operands), logger)
             assert_immediate_size(8, operands[1], logger)
-            byte_2 = (operands[0] & 0b00001111) << 4 | operands[1]
-            logger.debug(f"    Generated second byte: {byte_2:08b}  (register: {operands[0]:04b}, imm8: {operands[1]:08b})")
+            byte_2 = (operands[0] & 0b00001111) << 4 # register goes into the high 4 bits
+            logger.verbose(f"    Generated second byte: {byte_2:08b}  (register: {operands[0]:04b}, imm8: {operands[1]:08b})")
             binary.append(byte_2)
-            byte_3 = (operands[1])
-            logger.debug(f"    Generated third byte: {byte_3:08b}   (imm8: {operands[1]:08b})")
+            byte_3 = operands[1]
+            logger.verbose(f"    Generated third byte: {byte_3:08b}   (imm8: {operands[1]:08b})")
             binary.append(byte_3)
 
         case 5: # register and 16-bit immediate operand
             assert_operand_count(2, len(operands), logger)
             assert_immediate_size(16, operands[1], logger)
             byte_2 = (operands[0] & 0b00001111) << 4
-            logger.debug(f"    Generated second byte: {byte_2:08b}  (register: {(operands[0] & 0b00001111):04b})")
+            logger.verbose(f"    Generated second byte: {byte_2:08b}  (register: {(operands[0] & 0b00001111):04b})")
             binary.append(byte_2)
 
             # little endian encoding
             byte_3 = operands[1] & 0b0000000011111111
-            logger.debug(f"    Generated third byte: {byte_3:08b}   (imm16 low byte: {byte_3:08b})")
+            logger.verbose(f"    Generated third byte: {byte_3:08b}   (imm16 low byte: {byte_3:08b})")
             binary.append(byte_3)
             byte_4 = operands[1] >> 8
-            logger.debug(f"    Generated fourth byte: {byte_4:08b}  (imm16 high byte: {byte_4:08b})")  
+            logger.verbose(f"    Generated fourth byte: {byte_4:08b}  (imm16 high byte: {byte_4:08b})")  
             binary.append(byte_4)
 
         case 6: # register and register pair operand
@@ -221,12 +227,12 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
 
             # byte 2 is the lonely register (operand 0)
             byte_2 = (operands[0] & 0b00001111) << 4
-            logger.debug(f"    Generated second byte: {byte_2:08b}  (register: {(operands[0] & 0b00001111):04b})")
+            logger.verbose(f"    Generated second byte: {byte_2:08b}  (register: {(operands[0] & 0b00001111):04b})")
             binary.append(byte_2)
 
             # byte three is the register pair (operand 1)
             byte_3 = (operands[1][0] & 0b00001111) << 4 | (operands[1][1] & 0b00001111)
-            logger.debug(f"    Generated third byte: {byte_3:08b}  (register pair: {(operands[1][0] & 0b00001111):04b}, {(operands[1][1] & 0b00001111):04b})")
+            logger.verbose(f"    Generated third byte: {byte_3:08b}  (register pair: {(operands[1][0] & 0b00001111):04b}, {(operands[1][1] & 0b00001111):04b})")
             binary.append(byte_3)
 
 
@@ -236,19 +242,23 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
 
             # byte 2 is unused
             binary.append(0b00000000)
-            logger.debug(f"    Generated second byte: {0b00000000:08b}  (unused)")
+            logger.verbose(f"    Generated second byte: {0b00000000:08b}  (unused)")
 
             # little endian encoding
-            byte_3 = (operands[0] >> 8) & 0b0000000011111111
-            logger.debug(f"    Generated second byte: {byte_3:08b}  (imm16 low byte: {byte_3:08b})")
+
+            # low 8 bits if the immediate
+            byte_3 = operands[0] & 0b0000000011111111
+            logger.verbose(f"    Generated third byte: {byte_3:08b}  (imm16 low byte: {byte_3:08b})")
             binary.append(byte_3)
-            byte_4 = operands[0] & 0b0000000011111111
-            logger.debug(f"    Generated third byte: {byte_4:08b}   (imm16 high byte: {byte_4:08b})")  
+            
+            # high 8 bits if the immediate
+            byte_4 = operands[0] >> 8
+            logger.verbose(f"    Generated fourth byte: {byte_4:08b}   (imm16 high byte: {byte_4:08b})")  
             binary.append(byte_4)
 
     return binary
 
-def encode_instruction(node, labels, logger):
+def encode_instruction(node, labels, pc, logger):
     # encode the instruction into a binary
     mnemonic = node.children[0].value.upper()
     line = node.children[0].line
@@ -257,7 +267,7 @@ def encode_instruction(node, labels, logger):
     addressing_mode = get_addressing_mode(mnemonic, tree_operands)
     expected_size = get_instruction_size(mnemonic, tree_operands, logger)
     
-    logger.debug(f"Generating binary for instruction {mnemonic} (line {line})...")
+    logger.verbose(f"Generating binary for instruction {mnemonic} (line {line})...")
 
     operands = []
 
@@ -265,10 +275,11 @@ def encode_instruction(node, labels, logger):
         operands.append(get_operand_value(operand, labels, logger))
 
 
-    logger.debug(f"    Got opcode={opcode}, operands={operands}, addressing_mode={addressing_mode}")
+    logger.verbose(f"    Got opcode={opcode}, operands={operands}, addressing_mode={addressing_mode}")
     binary_instruction = generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
 
-    logger.debug(f"    Final binary for {node.children[0].value.upper()}: {get_bytearray_bits_string(binary_instruction)}")
+    logger.debug(f"    Done generating instruction: | PC 0x{pc:04X} | {mnemonic:<5} | "
+                 f"{get_bytearray_bits_string(binary_instruction):<36}| {binary_instruction.hex()}")
 
     if len(binary_instruction) != expected_size:
         logger.error(
@@ -293,6 +304,6 @@ def generate_binary(tree, labels, logger):
             continue
 
         if node.data == "instr":
-            binary.extend(encode_instruction(node, labels, logger))
+            binary.extend(encode_instruction(node, labels, len(binary), logger))
 
     return binary
