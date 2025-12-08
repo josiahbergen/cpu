@@ -146,7 +146,7 @@ def validate_instruction_semantics(node, logger):
         case "JMP" | "JZ" | "JNZ" | "JC" | "JNC":
             # 1 operand (labelname, number or register pair)
             validate_num_operands(1, len(optypes), mnemonic, line)
-            validate_operand_type(optypes[0], 0, [OPERAND_TYPES["LABELNAME"], OPERAND_TYPES["NUMBER"], OPERAND_TYPES["REGISTER_PAIR"]], mnemonic, line)
+            validate_operand_type(optypes[0], 0, [OPERAND_TYPES["LABELNAME"], OPERAND_TYPES["NUMBER"]], mnemonic, line)
             logger.debug(f"    Validated instruction semantics for {mnemonic} on line {line}: 1 operand (labelname/number/register pair)")
         case "MOVE" | "ADD" | "ADDC" | "SUB" | "SUBB" | "SHL" | "SHR" | "AND" | "OR" | "NOR" | "XOR" | "INB" | "OUTB" | "CMP":
             # 2 operands (register, register or number)
@@ -218,4 +218,3 @@ def get_instruction_size(mnemonic, operands, logger):
     if addressing_mode is None:
         return None
     return ADDRESSING_MODE_TO_SIZE[addressing_mode]
-    

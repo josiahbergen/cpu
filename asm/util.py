@@ -48,11 +48,11 @@ class Logger:
         print(colorama.Back.BLUE + colorama.Fore.BLACK + message + colorama.Fore.RESET + colorama.Back.RESET)
 
 
-# EBNF-like grammar
+# EBNF-like grammar.
 GRAMMAR = r"""
-    ?start: line*
+    ?start: line* # Programs must begin with a start label
 
-    ?line: instr
+    ?line: instr # Lines contain an instruction or a label
          | label
 
     label: LABELNAME ":"
@@ -66,19 +66,27 @@ GRAMMAR = r"""
             | NUMBER
             | LABELNAME
 
-    COMMENT: /;.*/
+    COMMENT: /;.*/ 
 
     # priorities for token matching
     # higher number = higher priority
-    MNEMONIC.100: /(LOAD|STORE|MOVE|MOV|PUSH|POP|ADD|ADDC|SUB|SUBB|INC|DEC|SHL|SHR|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|SEC|CLC|CLZ|JMP|JZ|JNZ|JC|JNC|INT|HALT|NOP)\b/i
+
+    # instructions are always matched first 
+    # (i.e. will never be interpreted as a label, etc.)
+    MNEMONIC.100: /(LOAD|STORE|MOVE|PUSH|POP|ADD|ADDC|SUB|SUBB|INC|DEC|SHL|SHR|AND|OR|NOR|NOT|XOR|INB|OUTB|CMP|SEC|CLC|CLZ|JMP|JZ|JNZ|JC|JNC|INT|HALT|NOP)\b/i
+
+    # Register pairs are matched before single registers
     REGISTER_PAIR.90: /(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS):(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS)/i
     REGISTER.80: /(A|B|C|D|X|Y|SP|PC|Z|F|MB|STS)\b/i
+    
     NUMBER.20: /0[xX][0-9a-fA-F]+/i
           | /[bB][01]+/
           | /[0-9]+/
     LABELNAME.10: /[A-Za-z_][A-Za-z0-9_]*/
 
+    # Lark provides common definitions for whitespace.
     %import common.WS
+    # Ignore comments and whitespace.
     %ignore WS
     %ignore COMMENT
 """

@@ -7,8 +7,8 @@ OPCODE  MNEMONIC    OPERAND 1           OPERAND 2           DESCRIPTION         
 0       LOAD        reg                 [imm16 | reg:reg]   load 8-bit value from memory    reg <- [imm16 | reg:reg]
 1       STORE       reg                 [imm16 | reg:reg]   store 8-bit value to memory     [imm16 | reg:reg] <- reg
 2       MOVE        reg                 reg | imm8          move 8-bit value                reg <- reg | imm8
-3       PUSH        reg | imm8                              push to stack                   [SP--] <- imm8/reg   *note that the stack grows downwards
-4       POP         reg                                     pop from stack                  reg <- [++SP]        *note that the stack grows down  
+3       PUSH        reg | imm8                              push to stack                   [SP--] <- imm8/reg 
+4       POP         reg                                     pop from stack                  reg <- [++SP] *note that the stack grows downwards
 5       ADD^        reg                 reg | imm8          add                             reg <- reg + (imm8 | reg) 
 6       ADDC^       reg                 reg | imm8          add with carry                  reg <- reg + (imm8 | reg)
 7       SUB^        reg                 reg | imm8          subtract                        reg <- reg - (imm8 | reg)

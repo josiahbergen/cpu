@@ -1,2 +1,19 @@
+; Simple JASM program to calculate the 10th Fibonacci number
+
 start:
+    LOAD A, 0
+    LOAD B, 1
+    LOAD C, 10 ; counter
     
+
+loop:
+    ADD A, B ; add the previous two fibonacci numbers. result is in A.
+    MOVE B, A ; store the result in B
+
+    DEC C ; decrement counter
+    JZ end ; if counter is 0, we're done
+
+    JMP loop ; otherwise, continue the loop
+
+end:
+    HALT

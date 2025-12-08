@@ -26,6 +26,10 @@ def resolve_labels(tree, logger):
         if isinstance(node, Token) and node.type == 'COMMENT':
             continue
 
+        if not hasattr(node, "data"):
+            logger.error(f"Node has no data: {node}. Perhaps you have an empty start label?")
+            exit(1)
+
         if node.data == "label":
             label_name = node.children[0].value
 
