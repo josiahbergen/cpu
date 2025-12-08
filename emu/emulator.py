@@ -62,11 +62,15 @@ OP_INT   = 29
 OP_HALT  = 30
 OP_NOP   = 31
 
-# modes
-MODE_NO_IMM = 0b00
-MODE_IMM8   = 0b01
-MODE_PAIR16 = 0b10
-MODE_ABS16  = 0b11
+# modes - ALL 8 addressing modes from spec
+MODE_NO_OPERANDS = 0b000  # 0
+MODE_SINGLE_REG  = 0b001  # 1
+MODE_IMM8_ONLY   = 0b010  # 2
+MODE_REG_REG     = 0b011  # 3
+MODE_REG_IMM8    = 0b100  # 4
+MODE_REG_ABS16   = 0b101  # 5
+MODE_REG_PAIR16  = 0b110  # 6
+MODE_ABS16_ONLY  = 0b111  # 7
 
 def mask8(x): return x & 0xFF
 def mask16(x): return x & 0xFFFF
@@ -130,38 +134,60 @@ class CPU:
         first = self.fetch_byte()
         opcode = (first >> 3) & 0b11111
         mode = first & 0b111
-
-        if mode == MODE_NO_IMM:
-            d = self.fetch_byte()
-            reg_d = (d >> 4) & 0x0F
-            reg_s = d & 0x0F
-            return (opcode, mode, reg_d, reg_s)
-        elif mode == MODE_IMM8:
-            d = self.fetch_byte()
-            reg_d = (d >> 4) & 0x0F
-            imm8 = self.fetch_byte()
-            return (opcode, mode, reg_d, imm8)
-        elif mode == MODE_PAIR16:
-            d = self.fetch_byte()
-            reg_h = (d >> 4) & 0x0F
-            reg_l = d & 0x0F
-            lo = self.fetch_byte()
-            hi = self.fetch_byte()
-            imm16 = (hi<<8) | lo
-            return (opcode, mode, reg_h, reg_l, imm16)
-        elif mode == MODE_ABS16:
-            d = self.fetch_byte()
-            reg_d = (d >> 4) & 0x0F
-            lo = self.fetch_byte()
-            hi = self.fetch_byte()
-            addr = (hi<<8) | lo
-            return (opcode, mode, reg_d, addr)
-        else:
-            raise RuntimeError(f"invalid mode {mode} at 0x{self.PC:04X}")
+        
+        # Handle all 8 addressing modes according to spec
+        match mode:
+            case 0b000:  # MODE_NO_OPERANDS
+                return (opcode, mode)
+            
+            case 0b001:  # MODE_SINGLE_REG
+                byte2 = self.fetch_byte()
+                reg_c = (byte2 >> 4) & 0x0F
+                return (opcode, mode, reg_c)
+            
+            case 0b010:  # MODE_IMM8_ONLY
+                self.fetch_byte()  # Skip unused byte
+                imm8 = self.fetch_byte()
+                return (opcode, mode, imm8)
+            
+            case 0b011:  # MODE_REG_REG
+                byte2 = self.fetch_byte()
+                reg_d = (byte2 >> 4) & 0x0F
+                reg_s = byte2 & 0x0F
+                return (opcode, mode, reg_d, reg_s)
+            
+            case 0b100:  # MODE_REG_IMM8
+                byte2 = self.fetch_byte()
+                reg_d = (byte2 >> 4) & 0x0F
+                imm8 = self.fetch_byte()
+                return (opcode, mode, reg_d, imm8)
+            
+            case 0b101:  # MODE_REG_ABS16
+                byte2 = self.fetch_byte()
+                reg_d = (byte2 >> 4) & 0x0F
+                lo = self.fetch_byte()
+                hi = self.fetch_byte()
+                addr = (hi << 8) | lo
+                return (opcode, mode, reg_d, addr)
+            
+            case 0b110:  # MODE_REG_PAIR16
+                byte2 = self.fetch_byte()
+                reg_d = (byte2 >> 4) & 0x0F
+                reg_pair = byte2 & 0x0F
+                return (opcode, mode, reg_d, reg_pair)
+            
+            case 0b111:  # MODE_ABS16_ONLY
+                self.fetch_byte()  # Skip unused byte
+                lo = self.fetch_byte()
+                hi = self.fetch_byte()
+                addr = (hi << 8) | lo
+                return (opcode, mode, addr)
+            
+            case _:
+                raise RuntimeError(f"Invalid mode {mode} at 0x{self.PC:04X}")
 
     # ---------------- reg helpers ----------------
     def reg_get(self, code:int) -> int:
-        # return 0 for undefined codes
         name = REG_CODE_TO_NAME.get(code)
         if name is None: return 0
         return self.reg[name] & 0xFF
@@ -237,7 +263,6 @@ class CPU:
         res = a + b
         carry = 1 if res > 0xFF else 0
         r8 = mask8(res)
-        # overflow: if a and b have same sign and result has different sign
         v = 1 if (((a ^ b) & 0x80) == 0 and ((a ^ r8) & 0x80) != 0) else 0
         return r8, carry, v
 
@@ -249,332 +274,371 @@ class CPU:
 
     # ---------------- instruction handlers ----------------
 
-    # LOAD reg, [imm16 | reg:reg]
     def handle_load(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_ABS16:
-            _, _, reg_d, addr = decoded
-            val = self.read_u8(addr)
-            self.reg_set(reg_d, val)
-            self.update_ZN_from8(val)
-        elif mode == MODE_PAIR16:
-            _, _, reg_h, reg_l, _ = decoded
-            hi = self.reg_get(reg_h); lo = self.reg_get(reg_l)
-            addr = (hi<<8)|lo
-            val = self.read_u8(addr)
-            # convention: store into reg_h
-            self.reg_set(reg_h, val)
-            self.update_ZN_from8(val)
-        else:
-            raise RuntimeError("LOAD requires pair16 or abs16")
+        match mode:
+            case 0b101:  # MODE_REG_ABS16
+                _, _, reg_d, addr = decoded
+                val = self.read_u8(addr)
+                self.reg_set(reg_d, val)
+                self.update_ZN_from8(val)
+            case 0b110:  # MODE_REG_PAIR16
+                _, _, reg_d, reg_pair = decoded
+                hi = self.reg_get(reg_pair)
+                lo = self.reg_get((reg_pair + 1) & 0x0F)
+                addr = (hi << 8) | lo
+                val = self.read_u8(addr)
+                self.reg_set(reg_d, val)
+                self.update_ZN_from8(val)
+            case _:
+                raise RuntimeError("LOAD requires MODE_REG_ABS16 or MODE_REG_PAIR16")
 
-    # STORE reg -> [imm16 | reg:reg]
     def handle_store(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_ABS16:
-            _, _, reg_s, addr = decoded
-            val = self.reg_get(reg_s)
-            self.write_u8(addr, val)
-        elif mode == MODE_PAIR16:
-            _, _, reg_h, reg_l, _ = decoded
-            hi = self.reg_get(reg_h); lo = self.reg_get(reg_l)
-            addr = (hi<<8)|lo
-            # convention: store from reg_h
-            val = self.reg_get(reg_h)
-            self.write_u8(addr, val)
-        else:
-            raise RuntimeError("STORE requires pair16 or abs16")
+        match mode:
+            case 0b101:  # MODE_REG_ABS16
+                _, _, reg_s, addr = decoded
+                val = self.reg_get(reg_s)
+                self.write_u8(addr, val)
+            case 0b110:  # MODE_REG_PAIR16
+                _, _, reg_s, reg_pair = decoded
+                hi = self.reg_get(reg_pair)
+                lo = self.reg_get((reg_pair + 1) & 0x0F)
+                addr = (hi << 8) | lo
+                val = self.reg_get(reg_s)
+                self.write_u8(addr, val)
+            case _:
+                raise RuntimeError("STORE requires MODE_REG_ABS16 or MODE_REG_PAIR16")
 
-    # MOVE reg, reg | imm8
     def handle_move(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            self.reg_set(reg_d, imm8)
-            self.update_ZN_from8(imm8)
-        elif mode == MODE_NO_IMM:
-            _, _, reg_d, reg_s = decoded
-            v = self.reg_get(reg_s)
-            self.reg_set(reg_d, v)
-            self.update_ZN_from8(v)
-        else:
-            raise RuntimeError("MOVE supports imm8 or reg")
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                self.reg_set(reg_d, imm8)
+                self.update_ZN_from8(imm8)
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                v = self.reg_get(reg_s)
+                self.reg_set(reg_d, v)
+                self.update_ZN_from8(v)
+            case _:
+                raise RuntimeError("MOVE supports MODE_REG_IMM8 or MODE_REG_REG")
 
-    # PUSH reg | imm8
     def handle_push(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, _, imm8 = decoded
-            self.push8(imm8)
-        elif mode == MODE_NO_IMM:
-            _, _, _, reg_s = decoded
-            v = self.reg_get(reg_s)
-            self.push8(v)
-        else:
-            raise RuntimeError("PUSH supports imm8 or reg")
+        match mode:
+            case 0b010:  # MODE_IMM8_ONLY
+                _, _, imm8 = decoded
+                self.push8(imm8)
+            case 0b001:  # MODE_SINGLE_REG
+                _, _, reg_s = decoded
+                v = self.reg_get(reg_s)
+                self.push8(v)
+            case _:
+                raise RuntimeError("PUSH supports MODE_IMM8_ONLY or MODE_SINGLE_REG")
 
-    # POP reg
     def handle_pop(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_NO_IMM:
-            _, _, reg_d, _ = decoded
-            v = self.pop8()
-            self.reg_set(reg_d, v)
-            self.update_ZN_from8(v)
-        else:
-            raise RuntimeError("POP expects register dest")
+        match mode:
+            case 0b001:  # MODE_SINGLE_REG
+                _, _, reg_d = decoded
+                v = self.pop8()
+                self.reg_set(reg_d, v)
+                self.update_ZN_from8(v)
+            case _:
+                raise RuntimeError("POP expects MODE_SINGLE_REG")
 
-    # ADD reg, reg|imm8
     def handle_add(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            a = self.reg_get(reg_d); b = imm8
-            r, carry, v = self._add_core(a,b)
-            self.reg_set(reg_d, r)
-            self.set_flag(FLAG_C, carry); self.set_flag(FLAG_V, v)
-            self.update_ZN_from8(r)
-        else:
-            _, _, reg_d, reg_s = decoded
-            a = self.reg_get(reg_d); b = self.reg_get(reg_s)
-            r, carry, v = self._add_core(a,b)
-            self.reg_set(reg_d, r)
-            self.set_flag(FLAG_C, carry); self.set_flag(FLAG_V, v)
-            self.update_ZN_from8(r)
+        reg_d = None
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                a = self.reg_get(reg_d); b = imm8
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                a = self.reg_get(reg_d); b = self.reg_get(reg_s)
+            case _:
+                raise RuntimeError("ADD supports MODE_REG_IMM8 or MODE_REG_REG")
+        
+        r, carry, v = self._add_core(a, b)
+        self.reg_set(reg_d, r)
+        self.set_flag(FLAG_C, carry)
+        self.set_flag(FLAG_V, v)
+        self.update_ZN_from8(r)
 
-    # ADDC reg, reg|imm8 (add with carry)
     def handle_addc(self, decoded):
         c = self.get_flag(FLAG_C)
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            a = self.reg_get(reg_d); b = imm8 + c
-            r, carry, v = self._add_core(a,b)
-            self.reg_set(reg_d, r)
-            self.set_flag(FLAG_C, carry); self.set_flag(FLAG_V, v)
-            self.update_ZN_from8(r)
-        else:
-            _, _, reg_d, reg_s = decoded
-            a = self.reg_get(reg_d); b = self.reg_get(reg_s) + c
-            r, carry, v = self._add_core(a,b)
-            self.reg_set(reg_d, r)
-            self.set_flag(FLAG_C, carry); self.set_flag(FLAG_V, v)
-            self.update_ZN_from8(r)
+        reg_d = None
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                a = self.reg_get(reg_d); b = imm8 + c
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                a = self.reg_get(reg_d); b = self.reg_get(reg_s) + c
+            case _:
+                raise RuntimeError("ADDC supports MODE_REG_IMM8 or MODE_REG_REG")
+        
+        r, carry, v = self._add_core(a, b)
+        self.reg_set(reg_d, r)
+        self.set_flag(FLAG_C, carry)
+        self.set_flag(FLAG_V, v)
+        self.update_ZN_from8(r)
 
-    # SUB reg, reg|imm8
     def handle_sub(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            a = self.reg_get(reg_d); b = imm8
-            r, borrow, v = self._sub_core(a,b)
-            self.reg_set(reg_d, r)
-            self.set_flag(FLAG_C, borrow); self.set_flag(FLAG_V, v)
-            self.update_ZN_from8(r)
-        else:
-            _, _, reg_d, reg_s = decoded
-            a = self.reg_get(reg_d); b = self.reg_get(reg_s)
-            r, borrow, v = self._sub_core(a,b)
-            self.reg_set(reg_d, r)
-            self.set_flag(FLAG_C, borrow); self.set_flag(FLAG_V, v)
-            self.update_ZN_from8(r)
+        reg_d = None
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                a = self.reg_get(reg_d); b = imm8
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                a = self.reg_get(reg_d); b = self.reg_get(reg_s)
+            case _:
+                raise RuntimeError("SUB supports MODE_REG_IMM8 or MODE_REG_REG")
+        
+        r, borrow, v = self._sub_core(a, b)
+        self.reg_set(reg_d, r)
+        self.set_flag(FLAG_C, borrow)
+        self.set_flag(FLAG_V, v)
+        self.update_ZN_from8(r)
 
-    # SUBB reg, reg|imm8 (subtract with borrow: borrow-in = carry flag)
     def handle_subb(self, decoded):
         bi = self.get_flag(FLAG_C)
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            a = self.reg_get(reg_d); b = imm8 + bi
-            r, borrow, v = self._sub_core(a,b)
-            self.reg_set(reg_d, r)
-            self.set_flag(FLAG_C, borrow); self.set_flag(FLAG_V, v)
-            self.update_ZN_from8(r)
-        else:
-            _, _, reg_d, reg_s = decoded
-            a = self.reg_get(reg_d); b = self.reg_get(reg_s) + bi
-            r, borrow, v = self._sub_core(a,b)
-            self.reg_set(reg_d, r)
-            self.set_flag(FLAG_C, borrow); self.set_flag(FLAG_V, v)
-            self.update_ZN_from8(r)
+        reg_d = None
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                a = self.reg_get(reg_d); b = imm8 + bi
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                a = self.reg_get(reg_d); b = self.reg_get(reg_s) + bi
+            case _:
+                raise RuntimeError("SUBB supports MODE_REG_IMM8 or MODE_REG_REG")
+        
+        r, borrow, v = self._sub_core(a, b)
+        self.reg_set(reg_d, r)
+        self.set_flag(FLAG_C, borrow)
+        self.set_flag(FLAG_V, v)
+        self.update_ZN_from8(r)
 
-    # INC reg
     def handle_inc(self, decoded):
         _, mode, *rest = decoded
-        if mode != MODE_NO_IMM:
-            raise RuntimeError("INC expects register")
-        _, _, reg_d, _ = decoded
+        if mode != MODE_SINGLE_REG:
+            raise RuntimeError("INC expects MODE_SINGLE_REG")
+        _, _, reg_d = decoded
         v = mask8(self.reg_get(reg_d) + 1)
         self.reg_set(reg_d, v)
         self.update_ZN_from8(v)
 
-    # DEC reg
     def handle_dec(self, decoded):
         _, mode, *rest = decoded
-        if mode != MODE_NO_IMM:
-            raise RuntimeError("DEC expects register")
-        _, _, reg_d, _ = decoded
+        if mode != MODE_SINGLE_REG:
+            raise RuntimeError("DEC expects MODE_SINGLE_REG")
+        _, _, reg_d = decoded
         v = mask8(self.reg_get(reg_d) - 1)
         self.reg_set(reg_d, v)
         self.update_ZN_from8(v)
 
-    # SHL reg, reg|imm8
     def handle_shl(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            cnt = imm8 & 7
-        else:
-            _, _, reg_d, reg_s = decoded
-            cnt = self.reg_get(reg_s) & 7
+        reg_d = None
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                cnt = imm8 & 7
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                cnt = self.reg_get(reg_s) & 7
+            case _:
+                raise RuntimeError("SHL supports MODE_REG_IMM8 or MODE_REG_REG")
+        
         v = mask8(self.reg_get(reg_d) << cnt)
         self.reg_set(reg_d, v)
         self.update_ZN_from8(v)
 
-    # SHR reg, reg|imm8
     def handle_shr(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            cnt = imm8 & 7
-        else:
-            _, _, reg_d, reg_s = decoded
-            cnt = self.reg_get(reg_s) & 7
+        reg_d = None
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                cnt = imm8 & 7
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                cnt = self.reg_get(reg_s) & 7
+            case _:
+                raise RuntimeError("SHR supports MODE_REG_IMM8 or MODE_REG_REG")
+        
         v = (self.reg_get(reg_d) >> cnt) & 0xFF
         self.reg_set(reg_d, v)
         self.update_ZN_from8(v)
 
-    # AND reg, reg|imm8
     def handle_and(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            v = self.reg_get(reg_d) & imm8
-        else:
-            _, _, reg_d, reg_s = decoded
-            v = self.reg_get(reg_d) & self.reg_get(reg_s)
+        reg_d = None
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                v = self.reg_get(reg_d) & imm8
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                v = self.reg_get(reg_d) & self.reg_get(reg_s)
+            case _:
+                raise RuntimeError("AND supports MODE_REG_IMM8 or MODE_REG_REG")
+        
         self.reg_set(reg_d, v)
         self.update_ZN_from8(v)
 
-    # OR
     def handle_or(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            v = self.reg_get(reg_d) | imm8
-        else:
-            _, _, reg_d, reg_s = decoded
-            v = self.reg_get(reg_d) | self.reg_get(reg_s)
+        reg_d = None
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                v = self.reg_get(reg_d) | imm8
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                v = self.reg_get(reg_d) | self.reg_get(reg_s)
+            case _:
+                raise RuntimeError("OR supports MODE_REG_IMM8 or MODE_REG_REG")
+        
         self.reg_set(reg_d, v)
         self.update_ZN_from8(v)
 
-    # NOR
     def handle_nor(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            v = (~(self.reg_get(reg_d) | imm8)) & 0xFF
-        else:
-            _, _, reg_d, reg_s = decoded
-            v = (~(self.reg_get(reg_d) | self.reg_get(reg_s))) & 0xFF
+        reg_d = None
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                v = (~(self.reg_get(reg_d) | imm8)) & 0xFF
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                v = (~(self.reg_get(reg_d) | self.reg_get(reg_s))) & 0xFF
+            case _:
+                raise RuntimeError("NOR supports MODE_REG_IMM8 or MODE_REG_REG")
+        
         self.reg_set(reg_d, v)
         self.update_ZN_from8(v)
 
-    # NOT
     def handle_not(self, decoded):
         _, mode, *rest = decoded
-        if mode != MODE_NO_IMM:
-            raise RuntimeError("NOT expects register")
-        _, _, reg_d, _ = decoded
+        if mode != MODE_SINGLE_REG:
+            raise RuntimeError("NOT expects MODE_SINGLE_REG")
+        _, _, reg_d = decoded
         v = (~self.reg_get(reg_d)) & 0xFF
         self.reg_set(reg_d, v)
         self.update_ZN_from8(v)
 
-    # XOR
     def handle_xor(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            v = self.reg_get(reg_d) ^ imm8
-        else:
-            _, _, reg_d, reg_s = decoded
-            v = self.reg_get(reg_d) ^ self.reg_get(reg_s)
+        reg_d = None
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                v = self.reg_get(reg_d) ^ imm8
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                v = self.reg_get(reg_d) ^ self.reg_get(reg_s)
+            case _:
+                raise RuntimeError("XOR supports MODE_REG_IMM8 or MODE_REG_REG")
+        
         self.reg_set(reg_d, v)
         self.update_ZN_from8(v)
 
-    # INB reg, port(reg|imm8)
     def handle_inb(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            port = imm8
-        else:
-            _, _, reg_d, reg_s = decoded
-            port = self.reg_get(reg_s)
+        reg_d = None
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                port = imm8
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                port = self.reg_get(reg_s)
+            case _:
+                raise RuntimeError("INB supports MODE_REG_IMM8 or MODE_REG_REG")
+        
         val = self.ports[port & 0xFF]
         self.reg_set(reg_d, val)
         self.update_ZN_from8(val)
 
-    # OUTB port(reg|imm8), reg
     def handle_outb(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            val = self.reg_get(reg_d)
-            self.ports[imm8 & 0xFF] = val
-        else:
-            _, _, reg_d, reg_s = decoded
-            port = self.reg_get(reg_d)
-            val = self.reg_get(reg_s)
-            self.ports[port & 0xFF] = val
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                val = self.reg_get(reg_d)
+                self.ports[imm8 & 0xFF] = val
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                port = self.reg_get(reg_d)
+                val = self.reg_get(reg_s)
+                self.ports[port & 0xFF] = val
+            case _:
+                raise RuntimeError("OUTB supports MODE_REG_IMM8 or MODE_REG_REG")
 
-    # CMP reg, reg|imm8
     def handle_cmp(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_IMM8:
-            _, _, reg_d, imm8 = decoded
-            a = self.reg_get(reg_d); b = imm8
-        else:
-            _, _, reg_d, reg_s = decoded
-            a = self.reg_get(reg_d); b = self.reg_get(reg_s)
+        match mode:
+            case 0b100:  # MODE_REG_IMM8
+                _, _, reg_d, imm8 = decoded
+                a = self.reg_get(reg_d); b = imm8
+            case 0b011:  # MODE_REG_REG
+                _, _, reg_d, reg_s = decoded
+                a = self.reg_get(reg_d); b = self.reg_get(reg_s)
+            case _:
+                raise RuntimeError("CMP supports MODE_REG_IMM8 or MODE_REG_REG")
+        
         res = (a - b) & 0xFF
         self.set_flag(FLAG_Z, res == 0)
         self.set_flag(FLAG_N, (res & 0x80) != 0)
         self.set_flag(FLAG_C, a < b)
 
-    # JMP abs or pair
     def handle_jmp(self, decoded):
         _, mode, *rest = decoded
-        if mode == MODE_ABS16:
-            _, _, _, addr = decoded
-            self.PC = addr
-        elif mode == MODE_PAIR16:
-            _, _, reg_h, reg_l, _ = decoded
-            hi = self.reg_get(reg_h)
-            lo = self.reg_get(reg_l)
-            self.PC = (hi<<8)|lo
-        else:
-            raise RuntimeError("JMP expects pair16 or abs16")
+        match mode:
+            case 0b111:  # MODE_ABS16_ONLY
+                _, _, addr = decoded
+                self.PC = addr
+            case 0b110:  # MODE_REG_PAIR16
+                _, _, reg_d, reg_pair = decoded
+                hi = self.reg_get(reg_pair)
+                lo = self.reg_get((reg_pair + 1) & 0x0F)
+                self.PC = (hi << 8) | lo
+            case _:
+                raise RuntimeError("JMP expects MODE_ABS16_ONLY or MODE_REG_PAIR16")
 
     def _conditional_jump(self, decoded, cond:bool):
         if cond:
             self.handle_jmp(decoded)
 
-    def handle_jz(self, decoded):  self._conditional_jump(decoded, self.get_flag(FLAG_Z) == 1)
-    def handle_jnz(self, decoded): self._conditional_jump(decoded, self.get_flag(FLAG_Z) == 0)
-    def handle_jc(self, decoded):  self._conditional_jump(decoded, self.get_flag(FLAG_C) == 1)
-    def handle_jnc(self, decoded): self._conditional_jump(decoded, self.get_flag(FLAG_C) == 0)
+    def handle_jz(self, decoded):  
+        self._conditional_jump(decoded, self.get_flag(FLAG_Z) == 1)
+    
+    def handle_jnz(self, decoded): 
+        self._conditional_jump(decoded, self.get_flag(FLAG_Z) == 0)
+    
+    def handle_jc(self, decoded):  
+        self._conditional_jump(decoded, self.get_flag(FLAG_C) == 1)
+    
+    def handle_jnc(self, decoded): 
+        self._conditional_jump(decoded, self.get_flag(FLAG_C) == 0)
 
-    # INT imm8 (stub)
     def handle_int(self, decoded):
         _, mode, *rest = decoded
-        if mode != MODE_IMM8:
-            raise RuntimeError("INT expects imm8")
+        if mode != MODE_IMM8_ONLY:
+            raise RuntimeError("INT expects MODE_IMM8_ONLY")
         _, _, imm8 = decoded
         print(f"[INT {imm8}] (stub)")
         self.STS |= 1
 
-    # HALT
     def handle_halt(self, decoded):
         self.halted = True
         self.STS |= STS_HALT
@@ -605,7 +669,6 @@ class CPU:
     def repl(self):
         print("Type help for a list of commands.")
         while True:
-
             try:
                 cmd = input("(emu) ").strip().split()
             except EOFError:
@@ -616,92 +679,99 @@ class CPU:
 
             if not cmd: 
                 continue
+            
             c = cmd[0].lower()
             try:
-                if c == "load":
-                    if len(cmd)<2:
-                        print("usage: load <path>")
-                        continue
-                    with open(cmd[1],"rb") as fh:
-                        self.load_program(fh.read())
-                
-                elif c == "step":
-                    res = self.step()
-                    if res: 
-                        print(res)
-                
-                elif c == "cont":
-                    while True:
+                match c:
+                    case "load":
+                        if len(cmd) < 2:
+                            print("usage: load <path>")
+                            continue
+                        with open(cmd[1], "rb") as fh:
+                            self.load_program(fh.read())
+                    
+                    case "step":
                         res = self.step()
-                        if res:
+                        if res: 
                             print(res)
-                            break
-                
-                elif c == "run":
-                    while True:
-                        res = self.step()
-                        if res:
-                            print(res)
-                            break
-                
-                elif c == "break":
-                    if len(cmd)<2:
-                        print("usage: break <hex>")
-                        continue
-                    addr = int(cmd[1],16)
-                    self.breakpoints.add(addr)
-                    print(f"breakpoint set @ 0x{addr:04X}")
-                
-                elif c == "regs":
-                    print(f"PC: 0x{self.PC:04X} SP: 0x{self.SP:04X} F: 0x{self.F:02X} STS: 0x{self.STS:02X}")
-                    for k in REG_INDEX:
-                        print(f"{k}: 0x{self.reg[k]:02X} ", end="")
-                    print()
-                
-                elif c == "mem":
-                    if len(cmd)<3:
-                        print("usage: mem <hexaddr> <len>")
-                        continue
-                    addr = int(cmd[1],16)
-                    ln = int(cmd[2])
-                    chunk = bytes(self.memory[addr:addr+ln])
-                    for i in range(0, len(chunk), 16):
-                        print(f"0x{i:04X} | ", end="")
-                        for i in range(i, i + 16):
-                            print(f"{chunk[i]:02X}".lower(), end=" ")
+                    
+                    case "cont":
+                        while True:
+                            res = self.step()
+                            if res:
+                                print(res)
+                                break
+                    
+                    case "run":
+                        while True:
+                            res = self.step()
+                            if res:
+                                print(res)
+                                break
+                    
+                    case "break":
+                        if len(cmd) < 2:
+                            print("usage: break <hex>")
+                            continue
+                        addr = int(cmd[1], 16)
+                        self.breakpoints.add(addr)
+                        print(f"breakpoint set @ 0x{addr:04X}")
+                    
+                    case "regs":
+                        print(f"PC: 0x{self.PC:04X} SP: 0x{self.SP:04X} F: 0x{self.F:02X} STS: 0x{self.STS:02X}")
+                        for k in REG_INDEX:
+                            print(f"{k}: 0x{self.reg[k]:02X} ", end="")
                         print()
-                
-                elif c == "disasm":
-                    if len(cmd)<2:
-                        print(self.disasm_at(self.PC))
-                    else:
-                        addr = int(cmd[1],16)
-                        print(self.disasm_at(addr))
-                
-                elif c == "ports":
-                    print("ports (nonzero):")
-                    for i,v in enumerate(self.ports):
-                        if v!=0:
-                            print(f" {i:02X}: {v:02X}")
-                
-                elif c == "quit":
-                    print("bye")
-                    break
-
-                elif c == "help":
-                    print("help: Display this help message")
-                    print("load <path>: Load a binary file into memory")
-                    print("step: Execute one instruction")
-                    print("cont: Continue execution until a breakpoint or halt")
-                    print("run: Run until halt")
-                    print("break <hex>: Set a breakpoint at address")
-                    print("regs: Display register values")
-                    print("mem <hex> <len>: Display memory contents")
-                    print("disasm [addr]: Disassemble instruction at address (or PC)")
-                    print("ports: Display non-zero port values")
-                    print("quit: Exit the emulator")
-                else:
-                    print("unknown command", c)
+                    
+                    case "mem":
+                        if len(cmd) < 3:
+                            print("usage: mem <hexaddr> <len>")
+                            continue
+                        addr = int(cmd[1], 16)
+                        ln = int(cmd[2])
+                        chunk = bytes(self.memory[addr:addr+ln])
+                        for i in range(0, len(chunk), 16):
+                            print(f"0x{addr+i:04X} | ", end="")
+                            for j in range(16):
+                                if i+j < len(chunk):
+                                    print(f"{chunk[i+j]:02x} ", end="")
+                                else:
+                                    print("   ", end="")
+                            print()
+                    
+                    case "disasm":
+                        if len(cmd) < 2:
+                            print(self.disasm_at(self.PC))
+                        else:
+                            addr = int(cmd[1], 16)
+                            print(self.disasm_at(addr))
+                    
+                    case "ports":
+                        print("ports (nonzero):")
+                        for i, v in enumerate(self.ports):
+                            if v != 0:
+                                print(f" {i:02X}: {v:02X}")
+                    
+                    case "quit":
+                        print("bye")
+                        break
+                    
+                    case "help":
+                        print("help: Display this help message")
+                        print("load <path>: Load a binary file into memory")
+                        print("step: Execute one instruction")
+                        print("cont: Continue execution until a breakpoint or halt")
+                        print("run: Run until halt")
+                        print("break <hex>: Set a breakpoint at address")
+                        print("regs: Display register values")
+                        print("mem <hex> <len>: Display memory contents")
+                        print("disasm [addr]: Disassemble instruction at address (or PC)")
+                        print("ports: Display non-zero port values")
+                        print("quit: Exit the emulator")
+                    
+                    case _:
+                        print("unknown command", c)
+            
             except Exception as e:
                 print("Error:", e)
 
@@ -710,7 +780,7 @@ def main():
     cpu = CPU()
     if len(sys.argv) > 1:
         path = sys.argv[1]
-        with open(path,"rb") as fh:
+        with open(path, "rb") as fh:
             cpu.load_program(fh.read())
     cpu.repl()
 

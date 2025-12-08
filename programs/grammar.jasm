@@ -1,17 +1,14 @@
 ; Simple JASM program to calculate the 10th Fibonacci number
 
 start:
-    MOVE A, 0xFF
-    STORE A, 0xC000
-    HALT
-
     MOVE A, 0
     MOVE B, 1
     MOVE C, 10 ; counter
 
 loop:
-    ADD A, B ; add the previous two fibonacci numbers. result is in A.
-    MOVE B, A ; store the result in B
+    MOVE D, A      ; save old A
+    ADD A, B       ; A = A + B (new fib number)
+    MOVE B, D      ; B = old A
 
     DEC C ; decrement counter
     JZ end ; if counter is 0, we're done
