@@ -98,7 +98,7 @@ Instruction format is `AAAAA BBB` `CCCC DDDD` `EEEE EEEE*` `FFFFFFFF*` where:
 - `011`: `CCCC` and `DDDD` define a first and second register argument, respectively. `EEEEEEEE FFFFFFFF` are unused.
 - `100`: `CCCC` defines a register argument. `EEEEEEE` defines an 8-bit immediate. `DDDD` is unused.
 - `101`: `CCCC` defines a single register argument. `EEEEEEEE FFFFFFFF` defines a memory location. `DDDD` is unused.
-- `110`: `CCCC` defines a single register argument. `EEEE EEEE` defines a register pair which is interpreted as a memory location.
+- `110`: `CCCC` defines a single register argument. `EEEE EEEE` (`LLLL HHHH`) defines a register pair which is interpreted as a memory location.
 - `111`: `EEEEEEEE FFFFFFFF` defines a 16-bit immediate. `CCCC DDDD` are unused.
 
 _\* These bytes are not in all instructions. See the table below._

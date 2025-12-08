@@ -16,5 +16,7 @@ loop:
     JMP loop ; otherwise, continue the loop
 
 end:
-    STORE A, 0xC000 ; store the result to memory
+    MOVE X, 0x00 ; low address
+    MOVE Y, 0xC0 ; high address
+    STORE A, X:Y ; store the result to memory
     HALT

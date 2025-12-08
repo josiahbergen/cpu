@@ -173,7 +173,7 @@ class CPU:
             case 0b110:  # MODE_REG_PAIR16
                 byte2 = self.fetch_byte()
                 reg_d = (byte2 >> 4) & 0x0F
-                reg_pair = byte2 & 0x0F
+                reg_pair = self.fetch_byte()
                 return (opcode, mode, reg_d, reg_pair)
             
             case 0b111:  # MODE_ABS16_ONLY
@@ -283,13 +283,14 @@ class CPU:
                 self.reg_set(reg_d, val)
                 self.update_ZN_from8(val)
             case 0b110:  # MODE_REG_PAIR16
-                _, _, reg_d, reg_pair = decoded
-                hi = self.reg_get(reg_pair)
-                lo = self.reg_get((reg_pair + 1) & 0x0F)
+                _, _, reg_s, reg_pair = decoded
+                # the high four bits of the register pair are the low register
+                # the low four bits of the register pair are the hi register
+                lo = self.reg_get(reg_pair >> 4)
+                hi = self.reg_get(reg_pair & 0x0F)
                 addr = (hi << 8) | lo
-                val = self.read_u8(addr)
-                self.reg_set(reg_d, val)
-                self.update_ZN_from8(val)
+                val = self.reg_get(reg_s)
+                self.write_u8(addr, val)   
             case _:
                 raise RuntimeError("LOAD requires MODE_REG_ABS16 or MODE_REG_PAIR16")
 
@@ -302,11 +303,13 @@ class CPU:
                 self.write_u8(addr, val)
             case 0b110:  # MODE_REG_PAIR16
                 _, _, reg_s, reg_pair = decoded
-                hi = self.reg_get(reg_pair)
-                lo = self.reg_get((reg_pair + 1) & 0x0F)
+                # the high four bits of the register pair are the low register
+                # the low four bits of the register pair are the hi register
+                lo = self.reg_get(reg_pair >> 4)
+                hi = self.reg_get(reg_pair & 0x0F)
                 addr = (hi << 8) | lo
                 val = self.reg_get(reg_s)
-                self.write_u8(addr, val)
+                self.write_u8(addr, val)   
             case _:
                 raise RuntimeError("STORE requires MODE_REG_ABS16 or MODE_REG_PAIR16")
 
@@ -608,9 +611,11 @@ class CPU:
                 _, _, addr = decoded
                 self.PC = addr
             case 0b110:  # MODE_REG_PAIR16
-                _, _, reg_d, reg_pair = decoded
-                hi = self.reg_get(reg_pair)
-                lo = self.reg_get((reg_pair + 1) & 0x0F)
+                _, _, reg_s, reg_pair = decoded
+                # the high four bits of the register pair are the low register
+                # the low four bits of the register pair are the hi register
+                lo = self.reg_get(reg_pair >> 4)
+                hi = self.reg_get(reg_pair & 0x0F)
                 self.PC = (hi << 8) | lo
             case _:
                 raise RuntimeError("JMP expects MODE_ABS16_ONLY or MODE_REG_PAIR16")
@@ -716,6 +721,10 @@ class CPU:
                         addr = int(cmd[1], 16)
                         self.breakpoints.add(addr)
                         print(f"breakpoint set @ 0x{addr:04X}")
+
+                    case "bclear":
+                        self.breakpoints.clear()
+                        print("breakpoints cleared")
                     
                     case "regs":
                         print(f"PC: 0x{self.PC:04X} SP: 0x{self.SP:04X} F: 0x{self.F:02X} STS: 0x{self.STS:02X}")
@@ -763,6 +772,7 @@ class CPU:
                         print("cont: Continue execution until a breakpoint or halt")
                         print("run: Run until halt")
                         print("break <hex>: Set a breakpoint at address")
+                        print("bclear: Clear all breakpoints")
                         print("regs: Display register values")
                         print("mem <hex> <len>: Display memory contents")
                         print("disasm [addr]: Disassemble instruction at address (or PC)")

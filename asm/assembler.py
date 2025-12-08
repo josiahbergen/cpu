@@ -250,7 +250,7 @@ def generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
             byte_3 = operands[0] & 0b0000000011111111
             logger.verbose(f"    Generated third byte: {byte_3:08b}  (imm16 low byte: {byte_3:08b})")
             binary.append(byte_3)
-            
+
             # high 8 bits if the immediate
             byte_4 = operands[0] >> 8
             logger.verbose(f"    Generated fourth byte: {byte_4:08b}   (imm16 high byte: {byte_4:08b})")  
@@ -278,7 +278,7 @@ def encode_instruction(node, labels, pc, logger):
     logger.verbose(f"    Got opcode={opcode}, operands={operands}, addressing_mode={addressing_mode}")
     binary_instruction = generate_instruction_binary(opcode, operands, addressing_mode, line, logger)
 
-    logger.debug(f"    Done generating instruction: | PC 0x{pc:04X} | {mnemonic:<5} | "
+    logger.debug(f"Binary: | PC 0x{pc:04X} | {mnemonic:<5} | "
                  f"{get_bytearray_bits_string(binary_instruction):<36}| {binary_instruction.hex()}")
 
     if len(binary_instruction) != expected_size:
